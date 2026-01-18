@@ -1070,20 +1070,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "create"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "light-client",
- "light-hasher",
- "light-program-test",
- "light-sdk",
- "light-sdk-types",
- "solana-sdk",
- "tokio",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1378,6 +1364,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "encore"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "light-client",
+ "light-hasher",
+ "light-program-test",
+ "light-sdk",
+ "light-sdk-types",
+ "solana-sdk",
+ "tokio",
 ]
 
 [[package]]

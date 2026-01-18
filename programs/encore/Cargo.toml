@@ -1,12 +1,12 @@
 [package]
-name = "create"
+name = "encore"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "Private ZK Ticketing System on Solana"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "create"
+name = "encore"
 
 [features]
 no-entrypoint = []
