@@ -18,3 +18,11 @@ pub struct EventUpdated {
     pub resale_cap_bps: u32,
     pub royalty_bps: u16,
 }
+
+#[event]
+pub struct TicketMinted {
+    pub event_config: Pubkey,
+    pub ticket_id: u32,
+    pub owner: Pubkey,
+    pub purchase_price: u64,
+}

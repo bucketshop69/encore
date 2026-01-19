@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-01-19
+
+### Added
+
+- **Ticket Minting with Light Protocol** (Issue #002)
+
+  - `mint_ticket` instruction for minting compressed tickets
+  - `CompressedTicket` struct stored in Light Protocol Merkle tree
+  - ZK-compressed accounts for 200x cost reduction
+  - Address derivation using `["ticket", event_config, ticket_id]`
+  - Max supply enforcement with `MaxSupplyReached` error
+  - `TicketMinted` anchor event
+
+- **Rust Integration Tests**
+  - `test_create_event` - EventConfig PDA creation
+  - `test_mint_ticket` - Compressed ticket minting
+  - `test_mint_ticket_fails_max_supply` - Supply limit enforcement
+
+- **Light Protocol Infrastructure**
+  - Light CLI installed for test infrastructure
+  - `light-program-test` integration for Rust tests
+
 ## [0.1.0] - 2026-01-18
 
 ### Added

@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use light_sdk::instruction::{PackedAddressTreeInfo, ValidityProof};
 
 pub mod constants;
 pub mod errors;
@@ -31,5 +32,15 @@ pub mod encore {
         royalty_bps: Option<u16>,
     ) -> Result<()> {
         instructions::update_event(ctx, resale_cap_bps, royalty_bps)
+    }
+
+    pub fn mint_ticket<'info>(
+        ctx: Context<'_, '_, '_, 'info, MintTicket<'info>>,
+        proof: ValidityProof,
+        address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
+        purchase_price: u64,
+    ) -> Result<()> {
+        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, purchase_price)
     }
 }

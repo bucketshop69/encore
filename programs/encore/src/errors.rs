@@ -28,4 +28,13 @@ pub enum EncoreError {
 
     #[msg("Event timestamp must be in the future")]
     EventTimestampInPast,
+
+    #[msg("Maximum ticket supply reached")]
+    MaxSupplyReached,
+
+    #[msg("Purchase price must be greater than zero")]
+    InvalidPurchasePrice,
+
+    #[msg("Invalid address tree")]
+    InvalidAddressTree,
 }
