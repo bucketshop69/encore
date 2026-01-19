@@ -6,23 +6,31 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Ticket Minting with Light Protocol** (Issue #002)
+- **Private Ticket Minting with Light Protocol** (Issue #002)
 
-  - `mint_ticket` instruction for minting compressed tickets
-  - `CompressedTicket` struct stored in Light Protocol Merkle tree
+  - `mint_ticket` instruction for minting privacy-preserving tickets
+  - `PrivateTicket` struct with `owner_commitment` instead of plain pubkey
+  - Ownership hidden via commitment: `SHA256(owner_pubkey || secret)`
+  - Only ticket owner knows their secret - no one else can identify them
   - ZK-compressed accounts for 200x cost reduction
   - Address derivation using `["ticket", event_config, ticket_id]`
   - Max supply enforcement with `MaxSupplyReached` error
-  - `TicketMinted` anchor event
+  - `TicketMinted` event emits commitment (not owner pubkey)
+
+- **Privacy Model**
+  - Ticket ownership hidden from on-chain observers
+  - Organizer only receives commitment, never sees recipient identity
+  - Foundation for ZK proof-based ownership verification
 
 - **Rust Integration Tests**
   - `test_create_event` - EventConfig PDA creation
-  - `test_mint_ticket` - Compressed ticket minting
+  - `test_mint_private_ticket` - Private ticket minting with commitment
   - `test_mint_ticket_fails_max_supply` - Supply limit enforcement
 
 - **Light Protocol Infrastructure**
   - Light CLI installed for test infrastructure
   - `light-program-test` integration for Rust tests
+
 
 ## [0.1.0] - 2026-01-18
 

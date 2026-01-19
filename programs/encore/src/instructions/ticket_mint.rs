@@ -12,7 +12,7 @@ use light_sdk::{
 use crate::constants::*;
 use crate::errors::EncoreError;
 use crate::events::TicketMinted;
-use crate::state::{CompressedTicket, EventConfig};
+use crate::state::{EventConfig, PrivateTicket};
 
 pub const LIGHT_CPI_SIGNER: CpiSigner =
     derive_light_cpi_signer!("2Ky4W1nqfzo82q4KTCR1RJpTjF7ihWU7dcwSVb7Rc6pT");
@@ -29,16 +29,24 @@ pub struct MintTicket<'info> {
         has_one = authority @ EncoreError::Unauthorized
     )]
     pub event_config: Account<'info, EventConfig>,
-
-    /// CHECK: Ticket recipient
-    pub recipient: UncheckedAccount<'info>,
 }
 
+/// Mint a private ticket to a recipient.
+/// 
+/// # Privacy
+/// The `owner_commitment` hides who owns the ticket.
+/// Recipient computes: commitment = Poseidon(their_pubkey, their_secret)
+/// Only the recipient knows the secret needed to prove ownership later.
+/// 
+/// # Arguments
+/// * `owner_commitment` - Hash of (owner_pubkey, secret), computed by recipient
+/// * `purchase_price` - Price paid for the ticket (becomes original_price)
 pub fn mint_ticket<'info>(
     ctx: Context<'_, '_, '_, 'info, MintTicket<'info>>,
     proof: ValidityProof,
     address_tree_info: PackedAddressTreeInfo,
     output_state_tree_index: u8,
+    owner_commitment: [u8; 32],
     purchase_price: u64,
 ) -> Result<()> {
     let event_config = &mut ctx.accounts.event_config;
@@ -71,7 +79,8 @@ pub fn mint_ticket<'info>(
         &crate::ID,
     );
 
-    let mut light_account = LightAccount::<CompressedTicket>::new_init(
+    // Create private ticket with commitment (not pubkey!)
+    let mut light_account = LightAccount::<PrivateTicket>::new_init(
         &crate::ID,
         Some(address),
         output_state_tree_index,
@@ -79,8 +88,7 @@ pub fn mint_ticket<'info>(
 
     light_account.event_config = event_config.key();
     light_account.ticket_id = ticket_id;
-    light_account.owner = ctx.accounts.recipient.key();
-    light_account.purchase_price = purchase_price;
+    light_account.owner_commitment = owner_commitment;
     light_account.original_price = purchase_price;
 
     use light_sdk::cpi::v2::LightSystemProgramCpi;
@@ -91,10 +99,11 @@ pub fn mint_ticket<'info>(
 
     event_config.tickets_minted = ticket_id;
 
+    // Emit event with commitment (preserves privacy)
     emit!(TicketMinted {
         event_config: event_config.key(),
         ticket_id,
-        owner: ctx.accounts.recipient.key(),
+        owner_commitment,
         purchase_price,
     });
 

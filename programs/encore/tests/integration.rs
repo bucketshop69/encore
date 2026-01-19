@@ -8,9 +8,10 @@ use light_sdk::{
     address::v2::derive_address,
     instruction::{PackedAccounts, SystemAccountMetaConfig},
 };
-use encore::state::CompressedTicket;
+use solana_sdk::hash::hash;
+use encore::state::PrivateTicket;
 use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
+    instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signature, Signer},
     system_program,
@@ -21,6 +22,15 @@ const TICKET_SEED: &[u8] = b"ticket";
 
 fn get_event_config_pda(authority: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[EVENT_SEED, authority.as_ref()], &encore::ID)
+}
+
+/// Compute owner commitment: SHA256(owner_pubkey || secret)
+/// In production, would use Poseidon for ZK-friendliness
+fn compute_owner_commitment(owner: &Pubkey, secret: &[u8; 32]) -> [u8; 32] {
+    let mut data = Vec::with_capacity(64);
+    data.extend_from_slice(owner.as_ref());
+    data.extend_from_slice(secret);
+    hash(&data).to_bytes()
 }
 
 #[tokio::test]
@@ -78,7 +88,7 @@ async fn test_create_event() {
 }
 
 #[tokio::test]
-async fn test_mint_ticket() {
+async fn test_mint_private_ticket() {
     let config = ProgramTestConfig::new(true, Some(vec![("encore", encore::ID)]));
     let mut rpc = LightProgramTest::new(config).await.unwrap();
     let payer = rpc.get_payer().insecure_clone();
@@ -116,8 +126,11 @@ async fn test_mint_ticket() {
         .await
         .unwrap();
 
-    // Now mint a ticket
+    // Generate recipient's secret and commitment
     let recipient = Keypair::new();
+    let recipient_secret: [u8; 32] = [42u8; 32]; // In real app, this would be random
+    let owner_commitment = compute_owner_commitment(&recipient.pubkey(), &recipient_secret);
+    
     let ticket_id: u32 = 1;
 
     let address_tree_info = rpc.get_address_tree_v2();
@@ -136,14 +149,14 @@ async fn test_mint_ticket() {
         &mut rpc,
         &payer,
         &event_config_pda,
-        &recipient.pubkey(),
+        owner_commitment,
         &ticket_address,
         1_000_000_000, // 1 SOL purchase price
     )
     .await
     .unwrap();
 
-    // Verify ticket was created
+    // Verify ticket was created with commitment (NOT the pubkey!)
     let compressed_account = rpc
         .get_compressed_account(ticket_address, None)
         .await
@@ -152,12 +165,11 @@ async fn test_mint_ticket() {
         .unwrap();
 
     let data = &compressed_account.data.as_ref().unwrap().data;
-    let ticket = CompressedTicket::deserialize(&mut &data[..]).unwrap();
+    let ticket = PrivateTicket::deserialize(&mut &data[..]).unwrap();
 
     assert_eq!(ticket.event_config, event_config_pda);
     assert_eq!(ticket.ticket_id, 1);
-    assert_eq!(ticket.owner, recipient.pubkey());
-    assert_eq!(ticket.purchase_price, 1_000_000_000);
+    assert_eq!(ticket.owner_commitment, owner_commitment); // Commitment, not pubkey!
     assert_eq!(ticket.original_price, 1_000_000_000);
 
     // Verify event config was updated
@@ -174,7 +186,7 @@ async fn mint_ticket(
     rpc: &mut LightProgramTest,
     payer: &Keypair,
     event_config: &Pubkey,
-    recipient: &Pubkey,
+    owner_commitment: [u8; 32],
     address: &[u8; 32],
     purchase_price: u64,
 ) -> Result<Signature, RpcError> {
@@ -207,13 +219,13 @@ async fn mint_ticket(
     let accounts = encore::accounts::MintTicket {
         authority: payer.pubkey(),
         event_config: *event_config,
-        recipient: *recipient,
     };
 
     let ix_data = encore::instruction::MintTicket {
         proof: rpc_result.proof,
         address_tree_info: packed_accounts.address_trees[0],
         output_state_tree_index,
+        owner_commitment,
         purchase_price,
     };
 
@@ -268,6 +280,9 @@ async fn test_mint_ticket_fails_max_supply() {
 
     // Mint first ticket - should succeed
     let recipient1 = Keypair::new();
+    let secret1: [u8; 32] = [1u8; 32];
+    let commitment1 = compute_owner_commitment(&recipient1.pubkey(), &secret1);
+    
     let address_tree_info = rpc.get_address_tree_v2();
 
     let (ticket1_address, _) = derive_address(
@@ -284,7 +299,7 @@ async fn test_mint_ticket_fails_max_supply() {
         &mut rpc,
         &payer,
         &event_config_pda,
-        &recipient1.pubkey(),
+        commitment1,
         &ticket1_address,
         1_000_000_000,
     )
@@ -293,6 +308,9 @@ async fn test_mint_ticket_fails_max_supply() {
 
     // Mint second ticket - should fail
     let recipient2 = Keypair::new();
+    let secret2: [u8; 32] = [2u8; 32];
+    let commitment2 = compute_owner_commitment(&recipient2.pubkey(), &secret2);
+    
     let (ticket2_address, _) = derive_address(
         &[
             TICKET_SEED,
@@ -307,7 +325,7 @@ async fn test_mint_ticket_fails_max_supply() {
         &mut rpc,
         &payer,
         &event_config_pda,
-        &recipient2.pubkey(),
+        commitment2,
         &ticket2_address,
         1_000_000_000,
     )

@@ -1,89 +1,126 @@
-# Issue #002: Ticket Minting with Light Protocol
+# Issue #002: Private Ticket Minting
 
 ## Overview
 
-Implement compressed ticket minting using Light Protocol's ZK Compression. Organizers can mint tickets as compressed PDAs stored in a Merkle tree, enabling 10k+ tickets for <$1.
+Implement **privacy-preserving** compressed ticket creation using Light Protocol. Ticket ownership and pricing must be hidden from public viewers but verifiable by the protocol.
 
-## Description
+## Privacy Requirements (from README)
 
-This is the first Light Protocol integration. Each ticket is a **compressed account** that:
+> "Ticket ownership and resale prices are hidden from public viewers but verifiable by the protocol."
+> "Users submit ZK Proofs to transition state (e.g., 'I own Ticket #42 and am selling it')."
 
-- Links to its parent EventConfig
-- Stores ownership and purchase price
-- Exists off-chain in a Merkle tree (only root on-chain)
-- Can be transferred via ZK proofs
+This means:
+- ❌ Cannot store `owner: Pubkey` in plaintext
+- ❌ Cannot store `purchase_price: u64` in plaintext  
+- ✅ Must use cryptographic commitments
+- ✅ Must support ZK proof verification
 
-## Technical Requirements
+## What's PUBLIC vs PRIVATE
 
-### Instruction: `mint_ticket`
+| Data | Visibility | Reason |
+|------|------------|--------|
+| Event rules (cap, royalty) | PUBLIC | Organizers want rules visible |
+| Ticket exists with ID #N | PUBLIC | Needed for indexing |
+| Original mint price | PUBLIC | Needed for resale cap math |
+| **Current owner** | **PRIVATE** | Core privacy feature |
+| **Resale price** | **PRIVATE** | Core privacy feature |
 
-- Mints a single compressed ticket to a recipient
-- Validates against EventConfig's max_supply
-- Increments EventConfig's tickets_minted counter
-- Stores initial purchase price on the ticket
+## Technical Approach
 
-### Compressed Ticket Structure
-
-```rust
-pub struct CompressedTicket {
-    pub event_config: Pubkey,    // Parent event
-    pub ticket_id: u32,          // Sequential ID (1, 2, 3...)
-    pub owner: Pubkey,           // Current owner
-    pub purchase_price: u64,     // Last purchase price (lamports)
-    pub original_price: u64,     // Initial mint price (for resale cap calc)
-}
-```
-
-### Light Protocol Integration
-
-- CPI to Light System Program for compressed account creation
-- Use `light-sdk` v0.17 features already in Cargo.toml
-- Compressed account address derived from [event_config, ticket_id]
-
-## Validation Logic
-
-- Only event authority can mint
-- Cannot exceed max_supply
-- Recipient must be valid pubkey
-- Purchase price must be > 0
-
-## Accounts Required
-
-- `authority` (signer) - Event organizer
-- `event_config` (mut) - To increment tickets_minted
-- `recipient` - Who receives the ticket
-- Light Protocol system accounts (CpiAccounts pattern)
-
-## Events
+### PrivateTicket Structure
 
 ```rust
-#[event]
-pub struct TicketMinted {
+pub struct PrivateTicket {
     pub event_config: Pubkey,
     pub ticket_id: u32,
-    pub owner: Pubkey,
-    pub purchase_price: u64,
+    pub owner_commitment: [u8; 32],    // Poseidon(owner_pubkey, secret, nonce)
+    pub price_commitment: [u8; 32],    // Pedersen(price, blinding) or just encrypted
+    pub original_price: u64,           // Public for resale cap enforcement
 }
 ```
 
-## Testing Considerations
+### Owner Commitment
 
-- Mint single ticket successfully
-- Mint up to max_supply
-- Fail when exceeding max_supply
-- Fail when non-authority tries to mint
-- Verify ticket data stored correctly
+The `owner_commitment` hides who owns the ticket:
+
+```
+owner_commitment = Poseidon(owner_pubkey, secret)
+```
+
+- `owner_pubkey`: The actual owner's public key
+- `secret`: Random value known only to owner (generated at mint)
+- Only the owner can produce a valid ZK proof without revealing their identity
+
+### Privacy During Minting
+
+```
+Organizer                           Recipient
+    │                                   │
+    │   "Give me your commitment"       │
+    │ ─────────────────────────────────>│
+    │                                   │
+    │   commitment = Hash(pubkey, secret)
+    │ <─────────────────────────────────│
+    │                                   │
+    │   mint_ticket(commitment)         │
+    │                                   │
+```
+
+The organizer never sees the recipient's secret - only the commitment.
+
+### Privacy During Transfer
+
+When transferring, the seller:
+1. Proves they own the ticket (ZK proof of commitment preimage)
+2. Reveals a **nullifier** to prevent double-spending
+3. Provides the buyer's new commitment
+
+```
+nullifier = Poseidon(ticket_id, secret)
+```
+
+The nullifier is stored as a compressed PDA to prevent reuse.
+
+## Files to Create/Modify
+
+| File | Purpose |
+|------|---------|
+| `state/ticket.rs` | `PrivateTicket` struct with commitments |
+| `instructions/ticket_mint.rs` | Accept commitment, store in Merkle tree |
+| `lib.rs` | Export new instruction |
+| `errors.rs` | Add commitment-related errors |
+
+## Minting Flow
+
+1. Recipient generates: `secret` (random bytes)
+2. Recipient computes: `commitment = Poseidon(pubkey, secret)`
+3. Recipient sends `commitment` to organizer
+4. Organizer calls `mint_ticket(event_config, commitment, price)`
+5. Program creates `PrivateTicket` with commitment (not pubkey)
+6. Program emits `TicketMinted` event (with commitment, not owner)
+
+## Why This Matters
+
+This approach ensures:
+- **No one** (indexers, observers) can see who owns tickets
+- **Only the owner** can prove ownership via ZK proof
+- **Resale caps** are still enforceable via range proofs
+- **Double-spending** is prevented via nullifiers
 
 ## Dependencies
 
-- Issue #001 (EventConfig) ✅ Complete
+- Issue #001 (EventConfig) ✅
+- `light-poseidon` crate for hashing
+- `light-sdk` for compressed accounts
 
-## Open Questions
+## Next Steps
 
-1. Should we support batch minting in a single tx? (can add later)
-2. Should mint price be configurable per-ticket or fixed per-event?
+After private minting works:
+- Issue #003: Private Transfer (ZK proof + nullifier creation)
+- Issue #004: Resale price proofs (range proofs for cap enforcement)
 
 ## References
 
-- [Light Protocol: Create Compressed Accounts](https://www.zkcompression.com/compressed-pdas/guides/how-to-create-compressed-accounts)
-- [Light SDK v0.17 docs](https://www.zkcompression.com/resources/sdks/program-development)
+- [Light Protocol ZK-ID](https://github.com/Lightprotocol/program-examples/tree/main/zk/zk-id)
+- [Light Protocol Nullifiers](https://github.com/Lightprotocol/program-examples/tree/main/zk/zk-nullifier)
+- [Poseidon Hash](https://docs.rs/light-poseidon)

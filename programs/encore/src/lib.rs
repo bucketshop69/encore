@@ -39,8 +39,9 @@ pub mod encore {
         proof: ValidityProof,
         address_tree_info: PackedAddressTreeInfo,
         output_state_tree_index: u8,
+        owner_commitment: [u8; 32],
         purchase_price: u64,
     ) -> Result<()> {
-        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, purchase_price)
+        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, owner_commitment, purchase_price)
     }
 }
