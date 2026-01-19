@@ -26,3 +26,13 @@ pub struct TicketMinted {
     pub owner_commitment: [u8; 32],
     pub purchase_price: u64,
 }
+
+#[event]
+pub struct TicketTransferred {
+    pub event_config: Pubkey,
+    pub ticket_id: u32,
+    pub old_commitment: [u8; 32],
+    pub new_commitment: [u8; 32],
+    pub nullifier: [u8; 32],
+}
+

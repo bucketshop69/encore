@@ -31,6 +31,14 @@ All notable changes to this project will be documented in this file.
   - Light CLI installed for test infrastructure
   - `light-program-test` integration for Rust tests
 
+- **Private Ticket Transfer** (Issue #003 - In Progress)
+  - `transfer_ticket` instruction for privacy-preserving transfers
+  - Seller proves ownership via pubkey + secret reveal
+  - Buyer identity hidden (only new commitment stored)
+  - Nullifier creation prevents double-spending
+  - Resale cap enforcement via EventConfig
+  - `TicketTransferred` event with commitments (no pubkeys)
+
 
 ## [0.1.0] - 2026-01-18
 

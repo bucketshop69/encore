@@ -37,4 +37,17 @@ pub enum EncoreError {
 
     #[msg("Invalid address tree")]
     InvalidAddressTree,
+
+    #[msg("Invalid ticket account")]
+    InvalidTicket,
+
+    #[msg("Seller does not own this ticket")]
+    NotTicketOwner,
+
+    #[msg("Resale price exceeds allowed cap")]
+    ExceedsResaleCap,
+
+    #[msg("Ticket already transferred (nullifier exists)")]
+    TicketAlreadyTransferred,
 }
+

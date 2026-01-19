@@ -40,4 +40,11 @@ impl EventConfig {
             None => false,
         }
     }
+
+    pub fn calculate_max_resale_price(&self, original_price: u64) -> u64 {
+        original_price
+            .checked_mul(self.resale_cap_bps as u64)
+            .and_then(|v| v.checked_div(10000))
+            .unwrap_or(0)
+    }
 }
