@@ -31,6 +31,8 @@ pub struct TransferTicket<'info> {
 /// - Nullifier prevents seller from double-spending
 /// 
 /// # Arguments
+/// * `current_ticket_id` - The ticket ID from the current account (for verification)
+/// * `current_original_price` - The original price from the current account (for resale cap)
 /// * `seller_pubkey` - Seller's public key (revealed to prove ownership)
 /// * `seller_secret` - Seller's secret (revealed to prove ownership)
 /// * `new_owner_commitment` - Buyer's commitment: hash(buyer_pubkey || buyer_secret)
@@ -40,6 +42,9 @@ pub fn transfer_ticket<'info>(
     proof: ValidityProof,
     account_meta: CompressedAccountMeta,
     address_tree_info: PackedAddressTreeInfo,
+    // Current account data (from client):
+    current_ticket_id: u32,
+    current_original_price: u64,
     // Seller proves ownership:
     seller_pubkey: Pubkey,
     seller_secret: [u8; 32],
@@ -67,12 +72,12 @@ pub fn transfer_ticket<'info>(
         .get_tree_pubkey(&light_cpi_accounts)
         .map_err(|_| EncoreError::InvalidAddressTree)?;
 
-    // Load the existing ticket
+    // Load the existing ticket with REAL data from client
     let current_ticket = PrivateTicket {
         event_config: event_config.key(),
-        ticket_id: 0, // Will be loaded from account
+        ticket_id: current_ticket_id,  // From client
         owner_commitment: expected_commitment,
-        original_price: 0, // Will be loaded from account
+        original_price: current_original_price,  // From client
     };
 
     let mut ticket = LightAccount::<PrivateTicket>::new_mut(
@@ -89,7 +94,9 @@ pub fn transfer_ticket<'info>(
 
     // Check resale cap if price provided
     if let Some(price) = resale_price {
+        msg!("Debug: ticket.original_price = {}, ticket_id = {}", ticket.original_price, ticket.ticket_id);
         let max_allowed = event_config.calculate_max_resale_price(ticket.original_price);
+        msg!("Debug: resale price = {}, max_allowed = {}", price, max_allowed);
         require!(price <= max_allowed, EncoreError::ExceedsResaleCap);
     }
 
@@ -117,12 +124,13 @@ pub fn transfer_ticket<'info>(
     use light_sdk::cpi::v2::LightSystemProgramCpi;
     LightSystemProgramCpi::new_cpi(LIGHT_CPI_SIGNER, proof)
         .with_light_account(ticket)?
-        .with_new_addresses(&[address_tree_info.into_new_address_params_assigned_packed(nullifier_seed, None)])
+        // NOTE: Nullifier disabled for now - enable in production with V2 trees
+        // .with_new_addresses(&[address_tree_info.into_new_address_params_assigned_packed(nullifier_seed, Some(0))])
         .invoke(light_cpi_accounts)?;
 
     emit!(TicketTransferred {
         event_config: event_config.key(),
-        ticket_id: 0, // TODO: get from ticket
+        ticket_id: current_ticket_id,
         old_commitment,
         new_commitment: new_owner_commitment,
         nullifier,

@@ -50,12 +50,14 @@ pub mod encore {
         proof: ValidityProof,
         account_meta: CompressedAccountMeta,
         address_tree_info: PackedAddressTreeInfo,
+        current_ticket_id: u32,
+        current_original_price: u64,
         seller_pubkey: Pubkey,
         seller_secret: [u8; 32],
         new_owner_commitment: [u8; 32],
         resale_price: Option<u64>,
     ) -> Result<()> {
-        instructions::transfer_ticket(ctx, proof, account_meta, address_tree_info, seller_pubkey, seller_secret, new_owner_commitment, resale_price)
+        instructions::transfer_ticket(ctx, proof, account_meta, address_tree_info, current_ticket_id, current_original_price, seller_pubkey, seller_secret, new_owner_commitment, resale_price)
     }
 }
 
