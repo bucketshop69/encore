@@ -619,3 +619,133 @@ async fn transfer_ticket(
     rpc.create_and_send_transaction(&[instruction], &payer.pubkey(), &[payer])
         .await
 }
+
+#[tokio::test]
+async fn test_prevent_double_spend() {
+    let config = ProgramTestConfig::new(true, Some(vec![("encore", encore::ID)]));
+    let mut rpc = LightProgramTest::new(config).await.unwrap();
+    let payer = rpc.get_payer().insecure_clone();
+
+    // Step 1: Create event
+    let (event_config_pda, _bump) = get_event_config_pda(&payer.pubkey());
+
+    let future_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+        + 86400;
+
+    let create_accounts = encore::accounts::CreateEvent {
+        authority: payer.pubkey(),
+        event_config: event_config_pda,
+        system_program: system_program::ID,
+    };
+
+    let create_ix_data = encore::instruction::CreateEvent {
+        max_supply: 100,
+        resale_cap_bps: 15000, // 1.5x
+        royalty_bps: 500,
+        event_name: "Double-Spend Test".to_string(),
+        event_timestamp: future_timestamp,
+    };
+
+    let create_instruction = Instruction {
+        program_id: encore::ID,
+        accounts: create_accounts.to_account_metas(None),
+        data: create_ix_data.data(),
+    };
+
+    rpc.create_and_send_transaction(&[create_instruction], &payer.pubkey(), &[&payer])
+        .await
+        .unwrap();
+
+    // Step 2: Mint ticket to Alice
+    let alice = Keypair::new();
+    let alice_secret: [u8; 32] = [42u8; 32];
+    let alice_commitment = compute_owner_commitment(&alice.pubkey(), &alice_secret);
+
+    let ticket_id: u32 = 1;
+    let original_price = 1_000_000_000; // 1 SOL
+
+    let address_tree_info = rpc.get_address_tree_v2();
+
+    let (ticket_address, _) = derive_address(
+        &[
+            TICKET_SEED,
+            event_config_pda.as_ref(),
+            &ticket_id.to_le_bytes(),
+        ],
+        &address_tree_info.tree,
+        &encore::ID,
+    );
+
+    mint_ticket(
+        &mut rpc,
+        &payer,
+        &event_config_pda,
+        alice_commitment,
+        &ticket_address,
+        original_price,
+    )
+    .await
+    .unwrap();
+
+    println!("✅ Minted ticket to Alice");
+
+    // Wait for indexer
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // Step 3: First transfer - Alice → Bob (SHOULD SUCCEED)
+    let bob = Keypair::new();
+    let bob_secret: [u8; 32] = [99u8; 32];
+    let bob_commitment = compute_owner_commitment(&bob.pubkey(), &bob_secret);
+
+    println!("🔄 First transfer: Alice → Bob");
+    
+    transfer_ticket(
+        &mut rpc,
+        &payer,
+        &event_config_pda,
+        &ticket_address,
+        &alice.pubkey(),
+        &alice_secret,
+        bob_commitment,
+        Some(1_400_000_000),
+    )
+    .await
+    .unwrap();
+
+    println!("✅ First transfer successful - Nullifier created");
+
+    // Wait for indexer to process
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // Step 4: Second transfer - Alice → Carol (SHOULD FAIL - Double-spend!)
+    let carol = Keypair::new();
+    let carol_secret: [u8; 32] = [123u8; 32];
+    let carol_commitment = compute_owner_commitment(&carol.pubkey(), &carol_secret);
+
+    println!("🔄 Second transfer attempt: Alice → Carol (using same secret)");
+    println!("   This should FAIL because nullifier already exists!");
+
+    let result = transfer_ticket(
+        &mut rpc,
+        &payer,
+        &event_config_pda,
+        &ticket_address,
+        &alice.pubkey(),
+        &alice_secret,  // ← SAME SECRET AS BEFORE!
+        carol_commitment,
+        Some(1_200_000_000),
+    )
+    .await;
+
+    // Assert it failed
+    assert!(
+        result.is_err(),
+        "Second transfer should have failed! Double-spend attack prevented."
+    );
+
+    println!("✅ Double-spend prevented! Nullifier security works!");
+    println!("   Error: {:?}", result.unwrap_err());
+}
