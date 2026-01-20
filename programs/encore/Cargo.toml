@@ -28,7 +28,7 @@ solana-sdk = "2.2"
 
 [dev-dependencies]
 light-client = "0.17.2"
-light-program-test = "0.17.1"
+light-program-test = { version = "0.17.1", features = ["v2"] }
 tokio = "1.36.0"
 
 [lints.rust.unexpected_cfgs]

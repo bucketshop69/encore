@@ -8,6 +8,7 @@ use light_sdk::{
     derive_light_cpi_signer,
     instruction::{PackedAddressTreeInfo, ValidityProof},
 };
+use light_sdk_types::ADDRESS_TREE_V2;
 
 use crate::constants::*;
 use crate::errors::EncoreError;
@@ -68,6 +69,12 @@ pub fn mint_ticket<'info>(
     let address_tree_pubkey = address_tree_info
         .get_tree_pubkey(&light_cpi_accounts)
         .map_err(|_| EncoreError::InvalidAddressTree)?;
+
+    // Validate we're using V2 address tree
+    if address_tree_pubkey.to_bytes() != ADDRESS_TREE_V2 {
+        msg!("Invalid address tree: must use V2");
+        return Err(ProgramError::InvalidAccountData.into());
+    }
 
     let (address, address_seed) = derive_address(
         &[

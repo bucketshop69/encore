@@ -8,10 +8,11 @@ use light_sdk::{
     cpi::{v2::CpiAccounts, InvokeLightSystemProgram, LightCpiInstruction},
     instruction::{account_meta::CompressedAccountMeta, PackedAddressTreeInfo, ValidityProof},
 };
+use light_sdk_types::ADDRESS_TREE_V2;
 
 use crate::errors::EncoreError;
 use crate::events::TicketTransferred;
-use crate::state::{EventConfig, PrivateTicket};
+use crate::state::{EventConfig, Nullifier, PrivateTicket};
 use crate::instructions::ticket_mint::LIGHT_CPI_SIGNER;
 
 #[derive(Accounts)]
@@ -72,6 +73,12 @@ pub fn transfer_ticket<'info>(
         .get_tree_pubkey(&light_cpi_accounts)
         .map_err(|_| EncoreError::InvalidAddressTree)?;
 
+    // Validate we're using V2 address tree
+    if address_tree_pubkey.to_bytes() != ADDRESS_TREE_V2 {
+        msg!("Invalid address tree: must use V2");
+        return Err(ProgramError::InvalidAccountData.into());
+    }
+
     // Load the existing ticket with REAL data from client
     let current_ticket = PrivateTicket {
         event_config: event_config.key(),
@@ -94,9 +101,7 @@ pub fn transfer_ticket<'info>(
 
     // Check resale cap if price provided
     if let Some(price) = resale_price {
-        msg!("Debug: ticket.original_price = {}, ticket_id = {}", ticket.original_price, ticket.ticket_id);
         let max_allowed = event_config.calculate_max_resale_price(ticket.original_price);
-        msg!("Debug: resale price = {}, max_allowed = {}", price, max_allowed);
         require!(price <= max_allowed, EncoreError::ExceedsResaleCap);
     }
 
@@ -104,28 +109,36 @@ pub fn transfer_ticket<'info>(
     let mut nullifier_data = Vec::with_capacity(36);
     nullifier_data.extend_from_slice(&ticket.ticket_id.to_le_bytes());
     nullifier_data.extend_from_slice(&seller_secret);
-    let nullifier = hash(&nullifier_data).to_bytes();
+    let nullifier_hash = hash(&nullifier_data).to_bytes();
 
     // Derive nullifier address
-    let (_nullifier_address, nullifier_seed) = derive_address(
+    let (nullifier_address, nullifier_seed) = derive_address(
         &[
             b"nullifier",
-            &nullifier,
+            &nullifier_hash,
         ],
         &address_tree_pubkey,
         &crate::ID,
     );
 
+    // Create nullifier light account
+    let mut nullifier_account = LightAccount::<Nullifier>::new_init(
+        &crate::ID,
+        Some(nullifier_address),
+        account_meta.output_state_tree_index,  // Use same tree as ticket
+    );
+    nullifier_account.ticket_id = ticket.ticket_id;
+
     // Update ticket ownership
     let old_commitment = ticket.owner_commitment;
     ticket.owner_commitment = new_owner_commitment;
 
-    // CPI to update the ticket in Merkle tree
+    // CPI to update the ticket AND create nullifier in one transaction
     use light_sdk::cpi::v2::LightSystemProgramCpi;
     LightSystemProgramCpi::new_cpi(LIGHT_CPI_SIGNER, proof)
-        .with_light_account(ticket)?
-        // NOTE: Nullifier disabled for now - enable in production with V2 trees
-        // .with_new_addresses(&[address_tree_info.into_new_address_params_assigned_packed(nullifier_seed, Some(0))])
+        .with_light_account(ticket)?  // Account index 0
+        .with_light_account(nullifier_account)?  // Account index 1
+        .with_new_addresses(&[address_tree_info.into_new_address_params_assigned_packed(nullifier_seed, Some(1))])  // Assign to account 1
         .invoke(light_cpi_accounts)?;
 
     emit!(TicketTransferred {
@@ -133,7 +146,7 @@ pub fn transfer_ticket<'info>(
         ticket_id: current_ticket_id,
         old_commitment,
         new_commitment: new_owner_commitment,
-        nullifier,
+        nullifier: nullifier_hash,
     });
 
     Ok(())

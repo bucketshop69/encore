@@ -527,13 +527,33 @@ async fn transfer_ticket(
     println!("   📋 Ticket address: {:?}", ticket_address);
     println!("   📋 Account hash: {:?}", compressed_account.hash);
     
-    // NOTE: Nullifier skipped in test due to mixed tree versions (StateV1 + AddressV2)
-    // In production with consistent V2 trees, add nullifier here
+    // Compute nullifier for double-spend protection (now enabled with V2 trees!)
+    let mut nullifier_data = Vec::with_capacity(36);
+    nullifier_data.extend_from_slice(&current_ticket.ticket_id.to_le_bytes());
+    nullifier_data.extend_from_slice(seller_secret);
+    let nullifier = hash(&nullifier_data).to_bytes();
+    
+    // Derive nullifier address
+    use light_sdk::address::v2::derive_address;
+    let (nullifier_address, _) = derive_address(
+        &[
+            b"nullifier",
+            &nullifier,
+        ],
+        &address_tree_info.tree,
+        &encore::ID,
+    );
+    
+    println!("   📋 Nullifier: {:?}", nullifier);
+    println!("   📋 Nullifier address: {:?}", nullifier_address);
     
     let rpc_result = rpc
         .get_validity_proof(
             vec![compressed_account.hash],
-            vec![],  // No nullifier in test
+            vec![AddressWithTree {
+                address: nullifier_address,
+                tree: address_tree_info.tree,
+            }],  // Include nullifier address
             None,
         )
         .await?
@@ -560,7 +580,7 @@ async fn transfer_ticket(
     let account_meta = CompressedAccountMeta {
         tree_info: packed_accounts.packed_tree_infos[0],  // ← From proof!
         output_state_tree_index: packed_accounts.output_tree_index,  // ← From proof!
-        address: compressed_account.address.unwrap_or([0u8; 32]),
+        address: compressed_account.address.unwrap_or([0u8; 32]),  // Keep the ticket's original address
     };
 
     println!("   ✓ Built CompressedAccountMeta from proof");
