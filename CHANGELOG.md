@@ -60,6 +60,22 @@ All notable changes to this project will be documented in this file.
   - ✅ Validates security guarantee: attempting second transfer with same secret fails
   - ✅ Clear error messaging for security failures
 
+- **Privacy Refactor: Ephemeral Keys** (2026-01-26 - ✅ COMPLETE)
+  - Refactored `PrivateTicket` to use `owner: Pubkey` (Ephemeral Key/Stealth Address) instead of hash commitment
+  - Updated `mint_ticket` to accept ephemeral public key directly
+  - Updated `transfer_ticket` to transfer from current ephemeral keypair to new ephemeral public key
+  - Simplifies client-side ZK proof generation by removing need for custom circuit inputs
+  - Maintains privacy by ensuring `owner` keys are fresh, disposable keypairs unlinked to user's main wallet
+  - **Rust Tests**: Updated `integration.rs` to validate full ephemeral key mint/transfer flow
+
+- **Client-Side Integration Tests**
+  - Created `tests/encore.ts` for full client-side integration
+  - Aligned client dependencies with Rust program versions:
+    - Downgraded `@lightprotocol/stateless.js` to `0.17.0`
+    - Downgraded `@lightprotocol/compressed-token` to `0.17.0`
+  - Implemented `mintTicket` and `transferTicket` helpers compatible with SDK v0.17
+  - **Note**: Client tests require external ZK Compression infrastructure (Indexer/Prover) not currently exposed by local validator. Rust tests serve as primary validation.
+
 
 
 ## [0.1.0] - 2026-01-18

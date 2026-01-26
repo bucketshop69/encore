@@ -16,9 +16,9 @@ pub struct PrivateTicket {
     /// Unique ticket identifier within the event
     pub ticket_id: u32,
     
-    /// Hidden owner: Poseidon(owner_pubkey, secret)
-    /// Only the owner knows the preimage (pubkey + secret)
-    pub owner_commitment: [u8; 32],
+    /// Owner (Ephemeral Public Key)
+    /// Privacy is achieved by using a fresh keypair for each ticket (Stealth Address).
+    pub owner: Pubkey,
     
     /// Original mint price (public for resale cap calculation)
     pub original_price: u64,

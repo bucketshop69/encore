@@ -47,7 +47,7 @@ pub fn mint_ticket<'info>(
     proof: ValidityProof,
     address_tree_info: PackedAddressTreeInfo,
     output_state_tree_index: u8,
-    owner_commitment: [u8; 32],
+    owner: Pubkey,
     purchase_price: u64,
 ) -> Result<()> {
     let event_config = &mut ctx.accounts.event_config;
@@ -95,7 +95,7 @@ pub fn mint_ticket<'info>(
 
     light_account.event_config = event_config.key();
     light_account.ticket_id = ticket_id;
-    light_account.owner_commitment = owner_commitment;
+    light_account.owner = owner;
     light_account.original_price = purchase_price;
 
     use light_sdk::cpi::v2::LightSystemProgramCpi;
@@ -110,7 +110,7 @@ pub fn mint_ticket<'info>(
     emit!(TicketMinted {
         event_config: event_config.key(),
         ticket_id,
-        owner_commitment,
+        owner,
         purchase_price,
     });
 

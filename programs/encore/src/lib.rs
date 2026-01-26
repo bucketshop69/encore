@@ -39,10 +39,10 @@ pub mod encore {
         proof: ValidityProof,
         address_tree_info: PackedAddressTreeInfo,
         output_state_tree_index: u8,
-        owner_commitment: [u8; 32],
+        owner: Pubkey,
         purchase_price: u64,
     ) -> Result<()> {
-        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, owner_commitment, purchase_price)
+        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, owner, purchase_price)
     }
 
     pub fn transfer_ticket<'info>(
@@ -52,12 +52,10 @@ pub mod encore {
         address_tree_info: PackedAddressTreeInfo,
         current_ticket_id: u32,
         current_original_price: u64,
-        seller_pubkey: Pubkey,
-        seller_secret: [u8; 32],
-        new_owner_commitment: [u8; 32],
+        new_owner: Pubkey,
         resale_price: Option<u64>,
     ) -> Result<()> {
-        instructions::transfer_ticket(ctx, proof, account_meta, address_tree_info, current_ticket_id, current_original_price, seller_pubkey, seller_secret, new_owner_commitment, resale_price)
+        instructions::transfer_ticket(ctx, proof, account_meta, address_tree_info, current_ticket_id, current_original_price, new_owner, resale_price)
     }
 }
 

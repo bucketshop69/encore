@@ -12,27 +12,32 @@ Simplify EventConfig by removing marketplace-specific fields and adding event me
 ## Proposed Changes
 
 ### Remove
+
 - ❌ `royalty_bps` - Marketplace feature, not privacy-related
 - ❌ `calculate_royalty()` - Helper for removed field
 - ⚠️ **Keep** `resale_cap_bps` - Prevents price manipulation (privacy-relevant)
 
 ### Add
+
 - ✅ `event_location: String` - Useful metadata for events
 - ✅ `event_description: String` (optional) - Better context
 
 ## Rationale
 
 **Why remove royalty?**
+
 - Not relevant to privacy hackathon
 - Adds complexity without privacy value
 - Judges care about ZK/privacy, not marketplace logic
 
 **Why keep resale cap?**
+
 - Prevents whales from price manipulation
 - Privacy protection: limits price discovery
 - Core to anti-scalping use case
 
 **Why add location?**
+
 - Real-world event metadata
 - Makes demo more realistic
 - Simple addition
@@ -40,6 +45,7 @@ Simplify EventConfig by removing marketplace-specific fields and adding event me
 ## Schema Changes
 
 ### Before
+
 ```rust
 pub struct EventConfig {
     pub authority: Pubkey,
@@ -56,6 +62,7 @@ pub struct EventConfig {
 ```
 
 ### After
+
 ```rust
 pub struct EventConfig {
     pub authority: Pubkey,
