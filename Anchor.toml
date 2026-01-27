@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-encore = "2Ky4W1nqfzo82q4KTCR1RJpTjF7ihWU7dcwSVb7Rc6pT"
+encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
 
 [registry]
 url = "https://api.apr.dev"

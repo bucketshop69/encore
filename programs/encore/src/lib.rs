@@ -9,7 +9,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("2Ky4W1nqfzo82q4KTCR1RJpTjF7ihWU7dcwSVb7Rc6pT");
+declare_id!("BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V");
 
 #[program]
 pub mod encore {
@@ -19,19 +19,20 @@ pub mod encore {
         ctx: Context<CreateEvent>,
         max_supply: u32,
         resale_cap_bps: u32,
-        royalty_bps: u16,
         event_name: String,
+        event_location: String,
+        event_description: String,
+        max_tickets_per_person: u8,
         event_timestamp: i64,
     ) -> Result<()> {
-        instructions::create_event(ctx, max_supply, resale_cap_bps, royalty_bps, event_name, event_timestamp)
+        instructions::create_event(ctx, max_supply, resale_cap_bps, event_name, event_location, event_description, max_tickets_per_person, event_timestamp)
     }
 
     pub fn update_event(
         ctx: Context<UpdateEvent>,
         resale_cap_bps: Option<u32>,
-        royalty_bps: Option<u16>,
     ) -> Result<()> {
-        instructions::update_event(ctx, resale_cap_bps, royalty_bps)
+        instructions::update_event(ctx, resale_cap_bps)
     }
 
     pub fn mint_ticket<'info>(

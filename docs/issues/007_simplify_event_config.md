@@ -21,6 +21,7 @@ Simplify EventConfig by removing marketplace-specific fields and adding event me
 
 - ✅ `event_location: String` - Useful metadata for events
 - ✅ `event_description: String` (optional) - Better context
+- ✅ `max_tickets_per_person: u8` - Limit tickets per wallet (max: 4)
 
 ## Rationale
 
@@ -71,6 +72,7 @@ pub struct EventConfig {
     pub resale_cap_bps: u32,     // KEEP
     pub event_name: String,
     pub event_location: String,  // NEW
+    pub max_tickets_per_person: u8, // NEW (Limit: 4)
     pub event_timestamp: i64,
     pub created_at: i64,
     pub updated_at: i64,

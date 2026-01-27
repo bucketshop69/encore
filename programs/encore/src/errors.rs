@@ -14,11 +14,14 @@ pub enum EncoreError {
     #[msg("Resale cap exceeds maximum allowed (10.0x)")]
     ResaleCapTooHigh,
 
-    #[msg("Royalty exceeds maximum allowed (50%)")]
-    RoyaltyTooHigh,
-
     #[msg("Event name exceeds maximum length")]
     EventNameTooLong,
+
+    #[msg("Event location exceeds maximum length")]
+    EventLocationTooLong,
+
+    #[msg("Event description exceeds maximum length")]
+    EventDescriptionTooLong,
 
     #[msg("Event name cannot be empty")]
     EventNameEmpty,

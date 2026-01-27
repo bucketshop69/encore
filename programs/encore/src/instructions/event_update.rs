@@ -21,7 +21,7 @@ pub struct UpdateEvent<'info> {
 pub fn update_event(
     ctx: Context<UpdateEvent>,
     resale_cap_bps: Option<u32>,
-    royalty_bps: Option<u16>,
+
 ) -> Result<()> {
     let event_config = &mut ctx.accounts.event_config;
     let clock = Clock::get()?;
@@ -32,10 +32,7 @@ pub fn update_event(
         event_config.resale_cap_bps = cap;
     }
 
-    if let Some(royalty) = royalty_bps {
-        require!(royalty <= MAX_ROYALTY_BPS, EncoreError::RoyaltyTooHigh);
-        event_config.royalty_bps = royalty;
-    }
+
 
     event_config.updated_at = clock.unix_timestamp;
 
@@ -43,7 +40,7 @@ pub fn update_event(
         event_config: event_config.key(),
         authority: event_config.authority,
         resale_cap_bps: event_config.resale_cap_bps,
-        royalty_bps: event_config.royalty_bps,
+
     });
 
     Ok(())

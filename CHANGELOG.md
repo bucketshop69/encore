@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [0.2.0] - 2026-01-19
 
+## [0.2.1] - 2026-01-27
+
+### Changed
+
+- **Simplified EventConfig** (Issue #007 - ✅ COMPLETE)
+  - Removed `royalty_bps` and `calculate_royalty` (Marketplace capabilities removed for privacy focus)
+  - Added `event_location` (Max 64 chars) to `EventConfig` and `create_event`
+  - Added `event_description` (Max 200 chars) to `EventConfig` and `create_event`
+  - Added `max_tickets_per_person` (Max 4) to limit purchase quantity per wallet
+  - Updated `create_event` and `update_event` instructions to reflect schema changes
+  - Updated `EventCreated` and `EventUpdated` events
+  - Added new constants and error codes for field validations
+
+
 ### Added
 
 - **Private Ticket Minting with Light Protocol** (Issue #002)

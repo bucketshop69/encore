@@ -16,7 +16,7 @@ use crate::events::TicketMinted;
 use crate::state::{EventConfig, PrivateTicket};
 
 pub const LIGHT_CPI_SIGNER: CpiSigner =
-    derive_light_cpi_signer!("2Ky4W1nqfzo82q4KTCR1RJpTjF7ihWU7dcwSVb7Rc6pT");
+    derive_light_cpi_signer!("BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V");
 
 #[derive(Accounts)]
 pub struct MintTicket<'info> {
