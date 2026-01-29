@@ -6,8 +6,8 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
-    "@lightprotocol/compressed-token": "^0.17.0",
-    "@lightprotocol/stateless.js": "^0.17.0",
+    "@lightprotocol/compressed-token": "^0.22.0",
+    "@lightprotocol/stateless.js": "^0.22.1-alpha.1",
     "@solana/web3.js": "^1.95.8",
     "bn.js": "^5.2.2",
     "dotenv": "^17.2.3"

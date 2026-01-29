@@ -8,11 +8,14 @@ skip-lint = false
 [programs.localnet]
 encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
 
+[programs.devnet]
+encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

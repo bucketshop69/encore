@@ -7,8 +7,7 @@ use light_sdk::LightDiscriminator;
 /// Only the owner (who knows their secret) can prove ownership.
 /// 
 /// Commitment = Poseidon(owner_pubkey, secret)
-#[event]
-#[derive(Clone, Debug, Default, LightDiscriminator)]
+#[derive(Clone, Debug, Default, LightDiscriminator, AnchorSerialize, AnchorDeserialize)]
 pub struct PrivateTicket {
     /// Link to parent event
     pub event_config: Pubkey,

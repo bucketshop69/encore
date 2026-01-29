@@ -1,5 +1,6 @@
 pub const EVENT_SEED: &[u8] = b"event";
 pub const TICKET_SEED: &[u8] = b"ticket";
+pub const IDENTITY_COUNTER_SEED: &[u8] = b"identity_counter";
 
 pub const MIN_RESALE_CAP_BPS: u32 = 10000;
 pub const MAX_RESALE_CAP_BPS: u32 = 100000;

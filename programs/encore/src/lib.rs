@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
-use light_sdk::instruction::{account_meta::CompressedAccountMeta, PackedAddressTreeInfo, ValidityProof};
+use light_sdk::instruction::{
+    account_meta::CompressedAccountMeta, PackedAddressTreeInfo, ValidityProof,
+};
 
 pub mod constants;
 pub mod errors;
@@ -25,25 +27,46 @@ pub mod encore {
         max_tickets_per_person: u8,
         event_timestamp: i64,
     ) -> Result<()> {
-        instructions::create_event(ctx, max_supply, resale_cap_bps, event_name, event_location, event_description, max_tickets_per_person, event_timestamp)
+        instructions::create_event(
+            ctx,
+            max_supply,
+            resale_cap_bps,
+            event_name,
+            event_location,
+            event_description,
+            max_tickets_per_person,
+            event_timestamp,
+        )
     }
 
-    pub fn update_event(
-        ctx: Context<UpdateEvent>,
-        resale_cap_bps: Option<u32>,
-    ) -> Result<()> {
+    pub fn update_event(ctx: Context<UpdateEvent>, resale_cap_bps: Option<u32>) -> Result<()> {
         instructions::update_event(ctx, resale_cap_bps)
     }
 
     pub fn mint_ticket<'info>(
         ctx: Context<'_, '_, '_, 'info, MintTicket<'info>>,
         proof: ValidityProof,
-        address_tree_info: PackedAddressTreeInfo,
+        identity_address_tree_info: Option<PackedAddressTreeInfo>,
+        ticket_address_tree_info: PackedAddressTreeInfo,
         output_state_tree_index: u8,
         owner: Pubkey,
         purchase_price: u64,
+        ticket_address_seed: [u8; 32],
+        identity_account_meta: Option<CompressedAccountMeta>,
+        current_tickets_minted: Option<u8>,
     ) -> Result<()> {
-        instructions::mint_ticket(ctx, proof, address_tree_info, output_state_tree_index, owner, purchase_price)
+        instructions::mint_ticket(
+            ctx,
+            proof,
+            identity_address_tree_info,
+            ticket_address_tree_info,
+            output_state_tree_index,
+            owner,
+            purchase_price,
+            ticket_address_seed,
+            identity_account_meta,
+            current_tickets_minted,
+        )
     }
 
     pub fn transfer_ticket<'info>(
@@ -54,9 +77,19 @@ pub mod encore {
         current_ticket_id: u32,
         current_original_price: u64,
         new_owner: Pubkey,
+        new_address_seed: [u8; 32],
         resale_price: Option<u64>,
     ) -> Result<()> {
-        instructions::transfer_ticket(ctx, proof, account_meta, address_tree_info, current_ticket_id, current_original_price, new_owner, resale_price)
+        instructions::transfer_ticket(
+            ctx,
+            proof,
+            account_meta,
+            address_tree_info,
+            current_ticket_id,
+            current_original_price,
+            new_owner,
+            new_address_seed,
+            resale_price,
+        )
     }
 }
-

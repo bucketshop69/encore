@@ -12,6 +12,7 @@ use crate::errors::EncoreError;
 use crate::events::TicketTransferred;
 use crate::state::{EventConfig, PrivateTicket};
 use crate::instructions::ticket_mint::LIGHT_CPI_SIGNER;
+use crate::constants::TICKET_SEED;
 
 #[derive(Accounts)]
 pub struct TransferTicket<'info> {
@@ -33,17 +34,17 @@ pub struct TransferTicket<'info> {
 /// - The 'owner' signer is a fresh keypair that holds this specific ticket.
 /// - It is not linked to the user's main wallet.
 /// - Validating the signature proves ownership without revealing secrets on-chain.
+use light_sdk::address::v2::derive_address;
+
 pub fn transfer_ticket<'info>(
     ctx: Context<'_, '_, '_, 'info, TransferTicket<'info>>,
     proof: ValidityProof,
     account_meta: CompressedAccountMeta,
     address_tree_info: PackedAddressTreeInfo,
-    // Current account data (from client):
     current_ticket_id: u32,
     current_original_price: u64,
-    // Buyer's new owner key:
     new_owner: Pubkey,
-    // Optional resale price:
+    new_address_seed: [u8; 32],
     resale_price: Option<u64>,
 ) -> Result<()> {
     let event_config = &ctx.accounts.event_config;
@@ -93,20 +94,28 @@ pub fn transfer_ticket<'info>(
     }
 
     // Update ticket ownership
-    let old_owner = ticket.owner;
+    let _old_owner = ticket.owner;
     ticket.owner = new_owner;
+
+    // Derive NEW address for privacy rotation
+    let (_, address_seed) = derive_address(
+        &[
+            TICKET_SEED,
+            new_address_seed.as_ref(),
+        ],
+        &address_tree_pubkey,
+        &crate::ID,
+    );
 
     // CPI to update the ticket (consume old UTXO, create new one)
     use light_sdk::cpi::v2::LightSystemProgramCpi;
     LightSystemProgramCpi::new_cpi(LIGHT_CPI_SIGNER, proof)
         .with_light_account(ticket)?
+        .with_new_addresses(&[address_tree_info.into_new_address_params_assigned_packed(address_seed, Some(0))])
         .invoke(light_cpi_accounts)?;
 
     emit!(TicketTransferred {
         event_config: event_config.key(),
-        ticket_id: current_ticket_id,
-        old_owner,
-        new_owner,
     });
 
     Ok(())

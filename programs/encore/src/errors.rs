@@ -52,5 +52,11 @@ pub enum EncoreError {
 
     #[msg("Ticket already transferred (nullifier exists)")]
     TicketAlreadyTransferred,
+
+    #[msg("Maximum tickets per person reached for this event")]
+    MaxTicketsPerPersonReached,
+
+    #[msg("Ticket has already been spent")]
+    TicketAlreadySpent,
 }
 
