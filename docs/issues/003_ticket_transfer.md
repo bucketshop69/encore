@@ -1,6 +1,14 @@
 # Issue #003: Private Ticket Transfer
 
-## Overview
+## ⚠️ SUPERSEDED BY ISSUE #009
+
+**This issue has been replaced by [Issue #009: Commitment + Nullifier Privacy Model](./009_commitment_nullifier_model.md)**
+
+The original design used mutation-based transfers. The current implementation uses CREATE-only operations (nullifier + new ticket) which works on devnet. See #009 for the working implementation.
+
+---
+
+## Overview (Archived)
 
 Implement privacy-preserving ticket transfer allowing owners to transfer tickets to new owners without revealing identities on-chain.
 
@@ -11,6 +19,7 @@ From README:
 > "Users submit ZK Proofs to transition state"
 
 Transfer must:
+
 - ✅ Hide seller identity (as much as possible in Option B)
 - ✅ Hide buyer identity (commitment only)
 - ✅ Prevent double-spending (nullifier)
@@ -63,6 +72,7 @@ Transfer must:
 ### 1. Ownership Proof
 
 Seller proves they own the ticket by revealing:
+
 ```rust
 // Seller provides:
 seller_pubkey: Pubkey,
@@ -76,6 +86,7 @@ require!(expected == ticket.owner_commitment);
 ### 2. Nullifier Creation
 
 Prevent double-spending:
+
 ```rust
 nullifier = hash(ticket_id || seller_secret)
 ```
@@ -85,6 +96,7 @@ Create as compressed PDA - if it exists, transfer fails.
 ### 3. Commitment Update
 
 Replace old commitment with buyer's:
+
 ```rust
 ticket.owner_commitment = new_owner_commitment;  // Buyer's hash
 ```
@@ -125,12 +137,14 @@ Note: No `seller` signer needed - ownership proved via commitment preimage!
 ## Validation Logic
 
 1. **Ownership check:**
+
    ```rust
    let computed = hash(seller_pubkey || seller_secret);
    require!(computed == ticket.owner_commitment, NotOwner);
    ```
 
 2. **Resale cap check (if price provided):**
+
    ```rust
    if let Some(price) = resale_price {
        let max_price = ticket.original_price * event.resale_cap_bps / 10000;

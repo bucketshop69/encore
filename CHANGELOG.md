@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-01-30
+
+### Added
+
+- **Commitment + Nullifier Privacy Model** (Issue #009 - ✅ COMPLETE)
+  - Replaced ephemeral key model with commitment-based ownership
+  - `owner_commitment = SHA256(owner_pubkey || secret)` hides ticket owner
+  - CREATE-only operations avoid devnet indexer issues with burns/mutations
+  - Nullifier pattern: CREATE empty account at `hash("nullifier" || secret)` to mark spent
+  - Single CPI creates both nullifier + new ticket atomically
+  - Fresh wallet separation (buyer1 mints, buyer1 transfers to buyer2)
+  - All tests passing on devnet with Helius RPC
+
+- **Transfer with Nullifier**
+  - `transfer_ticket` creates nullifier to prevent double-spend
+  - Creates new ticket with buyer's commitment in same transaction
+  - Seller signs (owns the secret), buyer provides new commitment
+  - Works reliably on devnet (no burns, no mutations)
+
+### Changed
+
+- **Simplified Ticket Structure**
+  - Changed `owner: Pubkey` to `owner_commitment: [u8; 32]`
+  - Privacy: commitment reveals nothing about owner identity
+
+### Deprecated
+
+- **Issue #002, #003, #008** - Superseded by #009
+  - Original Poseidon/ZK circuit approach replaced with SHA256 commitments
+  - Burn+Create pattern replaced with CREATE-only nullifier pattern
+
+---
+
 ## [0.2.0] - 2026-01-19
 
 ## [0.2.1] - 2026-01-27
@@ -16,7 +49,6 @@ All notable changes to this project will be documented in this file.
   - Updated `create_event` and `update_event` instructions to reflect schema changes
   - Updated `EventCreated` and `EventUpdated` events
   - Added new constants and error codes for field validations
-
 
 ### Added
 
@@ -89,8 +121,6 @@ All notable changes to this project will be documented in this file.
     - Downgraded `@lightprotocol/compressed-token` to `0.17.0`
   - Implemented `mintTicket` and `transferTicket` helpers compatible with SDK v0.17
   - **Note**: Client tests require external ZK Compression infrastructure (Indexer/Prover) not currently exposed by local validator. Rust tests serve as primary validation.
-
-
 
 ## [0.1.0] - 2026-01-18
 

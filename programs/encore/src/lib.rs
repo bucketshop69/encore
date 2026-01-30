@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
-use light_sdk::instruction::{
-    account_meta::CompressedAccountMeta, PackedAddressTreeInfo, ValidityProof,
-};
+use light_sdk::instruction::{PackedAddressTreeInfo, ValidityProof};
 
 pub mod constants;
 pub mod errors;
@@ -46,49 +44,49 @@ pub mod encore {
     pub fn mint_ticket<'info>(
         ctx: Context<'_, '_, '_, 'info, MintTicket<'info>>,
         proof: ValidityProof,
-        identity_address_tree_info: Option<PackedAddressTreeInfo>,
-        ticket_address_tree_info: PackedAddressTreeInfo,
+        address_tree_info: PackedAddressTreeInfo,
         output_state_tree_index: u8,
-        owner: Pubkey,
+        owner_commitment: [u8; 32],
         purchase_price: u64,
         ticket_address_seed: [u8; 32],
-        identity_account_meta: Option<CompressedAccountMeta>,
-        current_tickets_minted: Option<u8>,
     ) -> Result<()> {
         instructions::mint_ticket(
             ctx,
             proof,
-            identity_address_tree_info,
-            ticket_address_tree_info,
+            address_tree_info,
             output_state_tree_index,
-            owner,
+            owner_commitment,
             purchase_price,
             ticket_address_seed,
-            identity_account_meta,
-            current_tickets_minted,
         )
     }
 
+    /// Transfer ticket using Commitment + Nullifier pattern.
+    /// - Seller reveals secret to prove ownership
+    /// - Creates nullifier (prevents double-spend)
+    /// - Creates new ticket with buyer's commitment
     pub fn transfer_ticket<'info>(
         ctx: Context<'_, '_, '_, 'info, TransferTicket<'info>>,
         proof: ValidityProof,
-        account_meta: CompressedAccountMeta,
         address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
         current_ticket_id: u32,
         current_original_price: u64,
-        new_owner: Pubkey,
-        new_address_seed: [u8; 32],
+        seller_secret: [u8; 32],
+        new_owner_commitment: [u8; 32],
+        new_ticket_address_seed: [u8; 32],
         resale_price: Option<u64>,
     ) -> Result<()> {
         instructions::transfer_ticket(
             ctx,
             proof,
-            account_meta,
             address_tree_info,
+            output_state_tree_index,
             current_ticket_id,
             current_original_price,
-            new_owner,
-            new_address_seed,
+            seller_secret,
+            new_owner_commitment,
+            new_ticket_address_seed,
             resale_price,
         )
     }

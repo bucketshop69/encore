@@ -1,144 +1,276 @@
-# Issue #008: Privacy Architecture Refactor - Random UTXO & Identity Counters
+# Issue #008: Privacy Architecture Refactor - Simplified Burn+Create Model
+
+## ⚠️ SUPERSEDED BY ISSUE #009
+
+**This issue has been replaced by [Issue #009: Commitment + Nullifier Privacy Model](./009_commitment_nullifier_model.md)**
+
+The burn+create approach failed on devnet due to Light Protocol indexer limitations with burns/mutations. Issue #009 implements a CREATE-only model using commitments and nullifiers which works reliably on devnet.
+
+---
+
+## Implementation Status (Archived)
+
+### ✅ Completed (before superseded)
+
+- [x] Random UTXO Model for tickets (using random `address_seed`)
+- [x] Buyer/Event Owner separation (any user can purchase tickets)
+- [x] Deterministic address derivation for tickets
+- [x] Compute budget optimization (1M units for ZK operations)
+
+### ❌ Not Implemented (superseded)
+
+- [ ] ~~Simplified mint (CREATE only, no identity counter)~~ → See #009
+- [ ] ~~Transfer instruction (BURN + CREATE pattern)~~ → See #009 (nullifier pattern)
+- [ ] ~~Resale price cap enforcement~~ → Future
+
+### 📋 Pending (moved to #009)
+
+- [ ] ~~Double-spend prevention testing~~ → Completed in #009
+- [ ] ~~Check-in protocol design~~ → Future
+- [ ] ~~Client-side seed management strategy~~ → Completed in #009
 
 ## Overview
 
-Refactor the ticketing architecture to move from a "Linked Account Model" (where Ticket #5 is always at one address) to a **"Random UTXO Model"**. This is required to satisfy the core requirement: "Observers cannot track which specific ticket was traded, only that a trade occurred."
+Refactor the ticketing architecture to use a **"Burn+Create Model"** that avoids compressed account mutations entirely. This sidesteps the Light Protocol devnet indexer limitation where mutations fail due to stale Merkle proofs.
 
 ## The Problem
 
-Currently, the ticket address is derived from the Ticket ID:
-`address = derive(event, ticket_id)`
+### Original Problem
 
-This makes the ticket location **public and static**. When a transfer occurs, observers see the account at this specific address change owner. This leaks the transaction history of the asset.
+Ticket addresses derived from Ticket ID (`address = derive(event, ticket_id)`) are **public and static**, leaking transaction history.
+
+### New Problem (Indexer Limitation)
+
+Light Protocol's devnet indexer cannot re-index updated state fast enough:
+
+- First mint (new account creation) ✅ works
+- Mutations ❌ fail - indexer returns stale Merkle tree snapshots
+- Even 45+ second waits don't help
+- Confirmed by Light Protocol team as a known devnet limitation
 
 ## The Solution
 
+### Design Principle: No Mutations
+
+**All compressed account operations are either CREATE or BURN - never UPDATE.**
+
+This works because:
+
+| Operation | Proof Needed | Depends On |
+|-----------|--------------|------------|
+| CREATE | "Address doesn't exist" | Address tree (pre-tx) |
+| BURN | "Account exists at hash H" | State tree (pre-tx) |
+
+Both proofs are generated **before** the transaction executes. Neither depends on the other, so no indexer race conditions.
+
 ### 1. The "Random UTXO" (The Ticket)
 
-The Ticket itself must live at a **Random Address** known only to the owner.
+The Ticket lives at a **Random Address** known only to the owner.
 
-* **Minting**: User generates a random `address_seed`. Program mints `PrivateTicket` at `derive(address_seed)`.
-* **Transfer**: User "spends" the ticket at `OldAddress` and creates a new one at `NewAddress`.
-* **Privacy**: Observers see one account burn and another created. There is no mathematical link between them.
+- **Minting**: User generates a random `address_seed`. Program CREATEs `PrivateTicket` at `derive(address_seed)`.
+- **Transfer**: BURN ticket at `OldAddress`, CREATE new ticket at `NewAddress` (same transaction).
+- **Privacy**: Ephemeral keys hide owner identity. Transfer chain is visible but owner identities are not.
 
-### 2. The "Identity Counter" (The Limit Enforcer)
+### 2. No Identity Counter (Simplified)
 
-To enforce "Max N Tickets Per Person" without leaking the Ticket's location, we use a separate "Identity Counter" account.
+**Decision:** Remove spam prevention (`max_tickets_per_person`) for hackathon simplicity.
 
-* **Behavior**: Tracks "Tickets Minted Ever". Does not decrement on transfer.
-* **Address**: Derived deterministically from `Hash(Event_ID, User_ID)`.
-* **Data**: Stores `tickets_minted` count.
-* **Mint Logic**:
-    1. Check if `IdentityAccount` exists.
-    2. If No: Create it with count = 1.
-    3. If Yes: Load it. If `count < limit`, increment it. Else, fail.
-* **Privacy Trade-off**: Minting reveals *that* a user participated (acceptable for spam prevention), but does NOT reveal *which* ticket they got (because the Ticket is at a random address).
+**Rationale:**
+
+- Identity counters require mutations (increment on subsequent mints)
+- Mutations don't work on devnet
+- Spam prevention can be added later via regular Solana PDAs if needed
+
+**Trade-off:** Anyone can mint unlimited tickets. Acceptable for hackathon demo.
 
 ## Client-Side Strategy (Seed Management)
 
 To avoid forcing users to backup random seeds for every ticket, the client should use **Deterministic Derivation**:
 
-* **Master Seed**: `Signature(User_Wallet, "Encore Ticket Master Seed")`
-* **Ticket Seed (Minting)**: `Hash(Master_Seed, Event_ID, Counter_Index)`
-* **Recovery**: Client can re-scan the tree at these deterministic addresses to find owned tickets.
-* **Transfer Seed**: When transferring, the recipient provides a new random seed (or their own deterministic one).
-* **Edge Case - Received Tickets**:
-  * When a user RECEIVES a transferred ticket, the seed is chosen by the sender (or negotiated).
-  * Client must store this externally-provided seed locally.
-  * Recovery for these tickets involves checking stored seeds or potentially implementing an encrypted on-chain inbox (future work).
+- **Master Seed**: `Signature(User_Wallet, "Encore Ticket Master Seed")`
+- **Ticket Seed (Minting)**: `Hash(Master_Seed, Event_ID, Counter_Index)`
+- **Recovery**: Client can re-scan the tree at these deterministic addresses to find owned tickets.
+- **Transfer Seed**: When transferring, the recipient provides a new random seed (or their own deterministic one).
 
 ## Privacy Guarantees
 
 **What is Private:**
 
-* Which specific ticket ID a user owns.
-* Transfer history of individual tickets (Assets move from random `Addr_A` to `Addr_B`).
-* Double-spend protection (via Nullifiers).
+- Ticket owner identity (ephemeral keys, not linked to main wallet on-chain)
+- Which specific ticket ID a user owns
 
-**What is NOT Private:**
+**What is NOT Private (Acceptable for Hackathon):**
 
-* That a user (Wallet X) minted tickets for Event Y (via visible IdentityCounter).
-* How many tickets a user *originally* minted.
+- Transfer chain is visible: `addr_A → addr_B → addr_C` (same-tx burn+create links addresses)
+- That *a* transfer occurred (event logs show generic transfer)
+- Timing correlation between burn and create
 
-* That *a* transfer occurred (event logs show generic transfer).
-* Resale prices (if emitted in events).
-* Timing correlation: If Ticket A disappears and Ticket B appears simultaneously, observers may infer (but cannot prove) they are the same ticket transferring. Same for rapid sequential transfers.
+**Future Phase 2 (Full Privacy):**
+
+- ZK nullifier-based transfers to break address linkability
+- Requires Circom circuit development
 
 ## Open Questions / Future Work
 
-1. **Counter Reset**: Should event organizers be able to reset user counters? (Currently "Minted Ever" anti-scalping logic).
-2. **Encrypted Indexing**: Can we build an encrypted index so users don't need to scan the tree?
+1. **Full Unlinkability**: Implement ZK nullifier circuit to break transfer chain visibility (Phase 2).
+2. **Spam Prevention**: Add regular Solana PDA-based counters if needed post-hackathon.
 3. **Check-In Protocol**: How does venue verify ticket ownership without revealing identity? (Likely ZK Proof of Membership).
 
 ## Implementation Plan
 
-### `instructions/ticket_mint.rs`
+### `instructions/ticket_mint.rs` - SIMPLIFIED
 
-1. **Input**: Add `ticket_address_seed` (random 32 bytes) as instruction argument.
-2. **Logic**:
-    * Derive/Update `IdentityCounter` (at deterministic address).
-    * Create `PrivateTicket` (at random address derived from `ticket_address_seed`).
-    * Store `owner` (Ephemeral Key) inside the encrypted `PrivateTicket` data.
+**Goal:** CREATE compressed ticket only. No identity counter.
 
-### `instructions/ticket_transfer.rs`
+```rust
+pub fn mint_ticket(
+    ctx: Context<MintTicket>,
+    proof: ValidityProof,
+    address_tree_info: PackedAddressTreeInfo,
+    output_state_tree_index: u8,
+    owner: Pubkey,                    // Buyer's ephemeral pubkey
+    purchase_price: u64,
+    ticket_address_seed: [u8; 32],    // Random seed from client
+) -> Result<()> {
+    // 1. Derive ticket address from random seed
+    // 2. CREATE compressed PrivateTicket
+    // 3. Increment EventConfig.tickets_minted
+    // 4. Emit TicketMinted event
+}
+```
 
-1. **Input**: Add `new_address_seed` (random 32 bytes) for the new owner.
-2. **Logic**:
-    * Verify ownership (Signature of Ephemeral Key matches `PrivateTicket.owner`).
-    * **Burn** (Consume) the current `PrivateTicket` account.
-    * **Create** a NEW `PrivateTicket` account at `derive(new_address_seed)`.
-    * Update `owner` field to new owner's Ephemeral Key.
-3. **Events**:
-    * Remove `ticket_id` from `TicketMinted`/`TicketTransferred` events (privacy leak).
-    * Remove `owner` from events (privacy leak).
-    * Keep generic metadata: `event_config`, `timestamp`.
+**Key Changes from Previous:**
 
-### `errors.rs`
+- ❌ Remove identity counter logic entirely
+- ❌ Remove `identity_address_tree_info` parameter
+- ❌ Remove `identity_account_meta` parameter
+- ❌ Remove `current_tickets_minted` parameter
+- ✅ Single compressed account creation (ticket only)
 
-* Add new error variants:
-  * `MaxTicketsPerPersonReached` - When user counter hits limit.
-  * `TicketAlreadySpent` - When trying to use a nullified/spent ticket.
+### `instructions/ticket_transfer.rs` - BURN + CREATE
 
-### `state.rs`
+**Goal:** BURN old ticket, CREATE new ticket in same transaction.
 
-* Define `IdentityCounter` struct (Compressed Account).
+```rust
+pub fn transfer_ticket(
+    ctx: Context<TransferTicket>,
+    proof: ValidityProof,
+    // For BURN (existing ticket)
+    burn_account_meta: CompressedAccountMeta,
+    current_ticket_id: u32,
+    current_original_price: u64,
+    // For CREATE (new ticket)
+    address_tree_info: PackedAddressTreeInfo,
+    output_state_tree_index: u8,
+    new_owner: Pubkey,                // Buyer's ephemeral pubkey
+    new_address_seed: [u8; 32],       // Random seed for new address
+    resale_price: Option<u64>,        // For cap enforcement
+) -> Result<()> {
+    // 1. Verify seller owns ticket (ephemeral key signature)
+    // 2. Check resale price cap if applicable
+    // 3. BURN old ticket (LightAccount::new_burn)
+    // 4. CREATE new ticket at new random address (LightAccount::new_init)
+    // 5. Emit TicketTransferred event
+}
+```
 
-    ```rust
-    #[derive(LightDiscriminator)]
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub struct IdentityCounter {
-        pub event: Pubkey,       // Validation
-        pub authority: Pubkey,   // Validation (User)
-        pub tickets_minted: u8,  // Count
-    }
-    ```
+**Key Points:**
 
-* Update `PrivateTicket` (ensure it supports the decoupling).
+- Uses `new_burn()` for old ticket (no output state)
+- Uses `new_init()` for new ticket (fresh address)
+- Both in same CPI call - atomic
+- No mutations = no indexer issues
+
+### `state/identity_counter.rs` - REMOVED
+
+**Decision:** Remove `IdentityCounter` struct entirely. Not needed in simplified model.
+
+### `errors.rs` - SIMPLIFIED
+
+Keep only relevant errors:
+
+- ✅ `InvalidTicket` - Ticket validation failed
+- ✅ `ExceedsResaleCap` - Resale price too high
+- ✅ `InvalidAddressTree` - Wrong address tree used
+- ❌ Remove `MaxTicketsPerPersonReached` - No longer enforced
 
 ## Testing Strategy
 
-This architecture MUST be verified with Rust integration tests (`tests/integration.rs`).
+### Test Cases
 
-**Test Cases:**
+1. **✅ Mint Ticket**
+   - Generate random `address_seed`
+   - CREATE compressed ticket at derived address
+   - Verify ticket exists with correct data
+   - Verify `EventConfig.tickets_minted` incremented
 
-1. **Minting**:
-    * Mint Ticket A with `Seed_A`. Verify it exists.
-    * Mint Ticket B with `Seed_B`. Verify it exists.
-    * Verify `IdentityCounter` for user is now 2.
-2. **Limit Enforcement**:
-    * Set max limit to 1.
-    * Mint Ticket A -> Success.
-    * Mint Ticket B -> Fail (`EncoreError::MaxTicketsExceeded`).
-3. **Private Transfer (Resale)**:
-    * Mint Ticket at `Addr_A`.
-    * Transfer to `Addr_B`.
-    * **Assert**: Nullifier for `Addr_A` exists (marked spent).
-    * **Assert**: Account at `Addr_B` exists with correct data (Ticket ID preserved, Owner updated).
-    * **Assert**: Resale Price Cap is enforced:
-        * User provides `current_original_price` as instruction input.
-        * Proof verifies this matches the encrypted `original_price` in the account.
-        * If `resale_price > (original_price * resale_cap_bps / 10000)`, fail with `ExceedsResaleCap`.
-4. **Double-Spend Prevention**:
-    * Mint Ticket at `Addr_A`.
-    * Transfer to `Addr_B` (Success).
-    * Try to Transfer `Addr_A` again -> **Fail** (Nullifier conflict - Account spent).
+2. **📋 Transfer Ticket (BURN + CREATE)**
+   - Mint ticket at `addr_A` with `owner = ephemeral_key_1`
+   - Transfer: seller signs with `ephemeral_key_1`
+   - BURN ticket at `addr_A`
+   - CREATE ticket at `addr_B` with `owner = ephemeral_key_2`
+   - Verify `addr_A` no longer exists (burned)
+   - Verify `addr_B` exists with same `ticket_id`, new `owner`
+
+3. **📋 Double-Spend Prevention**
+   - Mint ticket at `addr_A`
+   - Transfer to `addr_B` (Success)
+   - Try to transfer `addr_A` again → **Fail** (account burned/nullified)
+
+4. **📋 Resale Cap Enforcement**
+   - Mint ticket with `original_price = 100`
+   - Event has `resale_cap_bps = 15000` (150%)
+   - Transfer with `resale_price = 150` → Success
+   - Transfer with `resale_price = 151` → Fail (`ExceedsResaleCap`)
+
+## Architecture Summary
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        MINT FLOW                            │
+├─────────────────────────────────────────────────────────────┤
+│  Buyer generates: ephemeral_keypair + random_seed           │
+│                          ↓                                  │
+│  CREATE PrivateTicket at derive(random_seed)                │
+│    - owner: ephemeral_pubkey                                │
+│    - ticket_id: incremented                                 │
+│    - original_price: purchase_price                         │
+│                          ↓                                  │
+│  Increment EventConfig.tickets_minted                       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                      TRANSFER FLOW                          │
+├─────────────────────────────────────────────────────────────┤
+│  Seller signs with ephemeral_key (proves ownership)         │
+│  Buyer provides: new_ephemeral_pubkey + new_random_seed     │
+│                          ↓                                  │
+│  BURN old ticket at addr_A                                  │
+│                          ↓                                  │
+│  CREATE new ticket at derive(new_random_seed)               │
+│    - owner: buyer's ephemeral_pubkey                        │
+│    - ticket_id: SAME (preserved)                            │
+│    - original_price: SAME (for resale cap)                  │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    WHY THIS WORKS                           │
+├─────────────────────────────────────────────────────────────┤
+│  ✅ No mutations → No indexer timing issues                 │
+│  ✅ CREATE proofs: "address doesn't exist" (pre-tx state)   │
+│  ✅ BURN proofs: "account exists at hash" (pre-tx state)    │
+│  ✅ Both independent → Can be in same transaction           │
+│  ✅ Works on devnet!                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Privacy Model
+
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Owner Identity | ✅ Hidden | Ephemeral keys, not linked to main wallet |
+| Ticket Location | ✅ Random | Derived from random seed |
+| Transfer Chain | ⚠️ Visible | Same-tx burn+create links addresses |
+| Mint Activity | ✅ Hidden | No identity counter to reveal participation |
+
+**Phase 2 Enhancement:** ZK nullifier circuit to break transfer chain linkability.

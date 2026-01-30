@@ -15,7 +15,7 @@ encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=89af9d38-1256-43d3-9c5a-a9aa454d0def"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
