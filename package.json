@@ -10,7 +10,8 @@
     "@lightprotocol/stateless.js": "^0.22.1-alpha.1",
     "@solana/web3.js": "^1.95.8",
     "bn.js": "^5.2.2",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "privacycash": "^1.1.12"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

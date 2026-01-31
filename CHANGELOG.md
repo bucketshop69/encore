@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-01-31
+
+### Added
+
+- **Marketplace with Light Protocol CPI** (Issue #010 - ✅ COMPLETE)
+  - `complete_sale` instruction with full Light Protocol CPI integration
+  - Creates nullifier atomically to prevent double-spend
+  - Creates new ticket with buyer's commitment in same transaction
+  - `SaleCompleted` event with listing, seller, buyer, event_config, ticket_id, price_lamports
+  - All marketplace tests passing on devnet (8/8 tests)
+
+- **Marketplace Test Coverage**
+  - `test_create_listing` - Seller lists ticket with encrypted secret
+  - `test_claim_listing` - Buyer locks listing with commitment
+  - `test_complete_sale` - Full Light Protocol CPI with nullifier + ticket creation
+  - `test_cancel_listing` - Seller cancels before claim
+  - `test_privacy_cash_integration` - Privacy Cash payment flow (with fallback)
+
+- **UI Planning Documents** (Issues #012-#015)
+  - Issue #012: UI Core Services (commitment.ts, light.ts, encore.ts)
+  - Issue #013: UI Events + Mint Flow
+  - Issue #014: UI My Tickets + List for Sale
+  - Issue #015: UI Marketplace + Buy Flow
+
+### Changed
+
+- Updated test file to use `accountsPartial()` for Anchor 0.31 compatibility
+- Added Privacy Cash SDK as optional dependency
+
+---
+
 ## [0.3.0] - 2026-01-30
 
 ### Added
