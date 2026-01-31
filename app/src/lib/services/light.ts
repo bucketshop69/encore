@@ -7,9 +7,14 @@ import {
     deriveAddressSeedV2,
     PackedAccounts,
     SystemAccountMetaConfig,
+    featureFlags,
+    VERSION,
 } from "@lightprotocol/stateless.js";
 import { sha256 } from "@noble/hashes/sha256";
 import { CONFIG } from "../config";
+
+// Enable V2 feature flag (Critical for V2 address trees)
+(featureFlags as any).version = VERSION.V2;
 
 // Singleton RPC instance
 let rpc: Rpc | null = null;

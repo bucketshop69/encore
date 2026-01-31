@@ -2,9 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-01-31
+
+### Codama Kit Migration (Issue #016 - ✅ COMPLETE)
+
+- **Client Architecture Overhaul**
+  - Migrated client-side SDK (`encore.ts`) to use Codama-generated instructions and types.
+  - Adopted `@solana/kit` (Web3.js v2) for better type safety and `bigint` support.
+  - Implemented **Hybrid Stack**:
+    - **Codama**: Used for Instruction building and Account decoding (Lightweight, Type-safe).
+    - **Anchor**: Retained for Transaction signing/sending and some GPA calls (Compatibility).
+  - Created `adapter.ts` to seamless bridge V2 types (Address, Instruction) with V1 legacy types.
+
+- **Type Safety & Data Handling**
+  - Unified all numeric types to `bigint` in domain interfaces (`EventConfig`, `Listing`).
+  - Removed reliance on `BN.js` in frontend logic (mapped at boundary).
+  - Fixed `EventDetail` and `Home` UI components to correctly handle native `bigint` values.
+
+- **Critical Fixes**
+  - **Light Protocol Integration**: Fixed critical "No associated TreeInfo" bug by properly enabling V2 feature flag.
+  - **State Tree Writability**: Resolved "Cross-program invocation with unauthorized signer or writable account" in `mintTicket` by forcing `outputStateTreeIndex` to be writable.
+
+---
+
 ## [0.3.3] - 2026-01-31
 
-### UI/UX Overhaul - "Industrial Rave" Theme (Issue #016 - ✅ COMPLETE)
+### UI/UX Overhaul - "Industrial Rave" Theme (Issues #013-#015 - ✅ COMPLETE)
 
 - **Premium Visual Identity**
 

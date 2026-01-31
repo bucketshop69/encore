@@ -1,14 +1,25 @@
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
-import { PublicKey, ComputeBudgetProgram } from "@solana/web3.js";
+import { PublicKey, ComputeBudgetProgram, Transaction } from "@solana/web3.js";
+import { createSolanaRpc, type Rpc } from "@solana/kit";
 import { CONFIG } from "../config";
 import * as light from "./light";
 import * as commitment from "./commitment";
+import { 
+    getCreateEventInstruction,
+    getCreateListingInstruction,
+    getClaimListingInstruction,
+    getCancelListingInstruction,
+    fetchEventConfig,
+    fetchListing,
+    ListingStatus as CodamaListingStatus
+} from "../../client";
+import { asSigner, toV2Address, toV1Instruction, toV1PublicKey } from "./adapter";
 
 // Import IDL JSON directly
 import encoreIdl from "../../../../target/idl/encore.json";
 
-// Event account type from IDL
+// Event account type - Mapped to Codama Types (Native BigInt)
 export interface EventConfig {
     authority: PublicKey;
     maxSupply: number;
@@ -18,24 +29,24 @@ export interface EventConfig {
     eventLocation: string;
     eventDescription: string;
     maxTicketsPerPerson: number; // u8
-    eventTimestamp: BN;
-    createdAt: BN;
-    updatedAt: BN;
+    eventTimestamp: bigint;
+    createdAt: bigint;
+    updatedAt: bigint;
     bump: number;
 }
 
-// Listing account type
+// Listing account type - Mapped to Codama Types (Native BigInt)
 export interface Listing {
     seller: PublicKey;
     eventConfig: PublicKey;
-    ticketId: BN;
+    ticketId: number;
     ownerCommitment: number[];
     encryptedSecret: number[];
-    pricePerTicket: BN;
+    priceLamports: bigint;
     buyer: PublicKey | null;
     buyerCommitment: number[] | null;
     status: { active: object } | { claimed: object } | { sold: object } | { cancelled: object };
-    createdAt: BN;
+    createdAt: bigint;
     bump: number;
 }
 
@@ -57,11 +68,13 @@ export class EncoreClient {
     program: any;
     programId: PublicKey;
     provider: AnchorProvider;
+    rpc: Rpc<any>;
 
     constructor(provider: AnchorProvider) {
         this.provider = provider;
         this.programId = new PublicKey(CONFIG.PROGRAM_ID);
         this.program = new Program(encoreIdl as Idl, provider);
+        this.rpc = createSolanaRpc(CONFIG.RPC_URL);
     }
 
     // ============================================
@@ -78,14 +91,50 @@ export class EncoreClient {
 
     async fetchEvent(eventConfig: PublicKey): Promise<EventConfig | null> {
         try {
-            return await this.program.account.eventConfig.fetch(eventConfig);
-        } catch {
+            // Use Codama fetcher (Direct V2)
+            const account = await fetchEventConfig(this.rpc, toV2Address(eventConfig));
+            if (!account) return null;
+
+            return {
+                authority: toV1PublicKey(account.data.authority),
+                maxSupply: account.data.maxSupply,
+                ticketsMinted: account.data.ticketsMinted,
+                resaleCapBps: account.data.resaleCapBps,
+                eventName: account.data.eventName,
+                eventLocation: account.data.eventLocation,
+                eventDescription: account.data.eventDescription,
+                maxTicketsPerPerson: account.data.maxTicketsPerPerson,
+                eventTimestamp: account.data.eventTimestamp,
+                createdAt: account.data.createdAt,
+                updatedAt: account.data.updatedAt,
+                bump: account.data.bump
+            };
+        } catch (e) {
+            console.error("Failed to fetch event:", e);
             return null;
         }
     }
 
     async fetchAllEvents(): Promise<EventWithPubkey[]> {
-        return this.program.account.eventConfig.all();
+        // Still using Anchor for GPA (all()) for now, but mapping to new V2 types
+        const events = await this.program.account.eventConfig.all();
+        return events.map((event: any) => ({
+            publicKey: event.publicKey,
+            account: {
+                authority: event.account.authority,
+                maxSupply: event.account.maxSupply,
+                ticketsMinted: event.account.ticketsMinted,
+                resaleCapBps: event.account.resaleCapBps,
+                eventName: event.account.eventName,
+                eventLocation: event.account.eventLocation,
+                eventDescription: event.account.eventDescription,
+                maxTicketsPerPerson: event.account.maxTicketsPerPerson,
+                eventTimestamp: BigInt(event.account.eventTimestamp.toString()),
+                createdAt: BigInt(event.account.createdAt.toString()),
+                updatedAt: BigInt(event.account.updatedAt.toString()),
+                bump: event.account.bump
+            }
+        }));
     }
 
     async createEvent(
@@ -100,23 +149,20 @@ export class EncoreClient {
     ): Promise<string> {
         const eventConfig = this.getEventConfigPda(authority);
 
-        const tx = await this.program.methods
-            .createEvent(
-                new BN(maxSupply),
-                new BN(resaleCapBps),
-                name,
-                location,
-                description,
-                maxTicketsPerPerson,
-                new BN(timestamp)
-            )
-            .accountsPartial({
-                authority,
-                eventConfig,
-            })
-            .rpc();
+        const inst = getCreateEventInstruction({
+            authority: asSigner(toV2Address(authority)),
+            eventConfig: toV2Address(eventConfig),
+            maxSupply,
+            resaleCapBps,
+            eventName: name,
+            eventLocation: location,
+            eventDescription: description,
+            maxTicketsPerPerson,
+            eventTimestamp: BigInt(timestamp)
+        });
 
-        return tx;
+        const tx = new Transaction().add(toV1Instruction(inst));
+        return await this.provider.sendAndConfirm(tx);
     }
 
     // ============================================
@@ -139,6 +185,17 @@ export class EncoreClient {
         const { packed, addressTreeIndex, outputStateTreeIndex } =
             await light.buildPackedAccounts(this.programId);
         const { remainingAccounts } = packed.toAccountMetas();
+
+        // FIX: Ensure the State Tree Queue is writable. 
+        // Light Protocol requires the output state tree to be writable for appending new leaves.
+        // PackedAccounts might default to ReadOnly.
+        if (outputStateTreeIndex < remainingAccounts.length) {
+            remainingAccounts[outputStateTreeIndex].isWritable = true;
+            console.log(`Forced OutputStateTree (idx ${outputStateTreeIndex}) to Writable: ${remainingAccounts[outputStateTreeIndex].pubkey.toBase58()}`);
+        } else {
+            console.warn("OutputStateTreeIndex out of bounds for remainingAccounts!");
+        }
+
         const addressTreeInfo = light.buildAddressTreeInfo(
             proofResult.rootIndices[0],
             addressTreeIndex
@@ -191,23 +248,21 @@ export class EncoreClient {
         const encryptedSecret = commitment.encryptSecret(secret, listingPda.toBytes());
         const ticketAddressSeed = commitment.generateRandomSecret();
 
-        const tx = await this.program.methods
-            .createListing(
-                Array.from(ticketCommitment),
-                Array.from(encryptedSecret),
-                new BN(priceLamports),
-                eventConfig,
-                ticketId,
-                Array.from(ticketAddressSeed),
-                0
-            )
-            .accountsPartial({
-                seller,
-                listing: listingPda,
-            })
-            .rpc();
+        const inst = getCreateListingInstruction({
+            seller: asSigner(toV2Address(seller)),
+            listing: toV2Address(listingPda),
+            eventConfig: toV2Address(eventConfig),
+            ticketCommitment: ticketCommitment,
+            encryptedSecret: encryptedSecret,
+            priceLamports: BigInt(priceLamports),
+            ticketId: ticketId,
+            ticketAddressSeed: ticketAddressSeed,
+            ticketBump: 0,
+        });
 
-        return { txSig: tx, listingPda };
+        const tx = new Transaction().add(toV1Instruction(inst));
+        const txSig = await this.provider.sendAndConfirm(tx);
+        return { txSig, listingPda };
     }
 
     async claimListing(
@@ -215,17 +270,22 @@ export class EncoreClient {
         buyer: PublicKey,
         buyerCommitment: Uint8Array
     ): Promise<string> {
-        return this.program.methods
-            .claimListing(Array.from(buyerCommitment))
-            .accountsPartial({ buyer, listing: listingPda })
-            .rpc();
+        const inst = getClaimListingInstruction({
+             buyer: asSigner(toV2Address(buyer)),
+             listing: toV2Address(listingPda),
+             buyerCommitment: buyerCommitment
+        });
+        const tx = new Transaction().add(toV1Instruction(inst));
+        return await this.provider.sendAndConfirm(tx);
     }
 
     async cancelListing(listingPda: PublicKey, seller: PublicKey): Promise<string> {
-        return this.program.methods
-            .cancelListing()
-            .accountsPartial({ seller, listing: listingPda })
-            .rpc();
+        const inst = getCancelListingInstruction({
+            seller: asSigner(toV2Address(seller)),
+            listing: toV2Address(listingPda)
+        });
+        const tx = new Transaction().add(toV1Instruction(inst));
+        return await this.provider.sendAndConfirm(tx);
     }
 
     async completeSale(
@@ -272,14 +332,57 @@ export class EncoreClient {
 
     async fetchListing(listingPda: PublicKey): Promise<Listing | null> {
         try {
-            return await this.program.account.listing.fetch(listingPda);
+            // Use Codama fetcher (Direct V2)
+            const account = await fetchListing(this.rpc, toV2Address(listingPda));
+            if (!account) return null;
+            
+            const data = account.data;
+            let statusObj: any = { active: {} };
+            switch (data.status) {
+                case CodamaListingStatus.Active: statusObj = { active: {} }; break;
+                case CodamaListingStatus.Claimed: statusObj = { claimed: {} }; break;
+                case CodamaListingStatus.Completed: statusObj = { sold: {} }; break;
+                case CodamaListingStatus.Cancelled: statusObj = { cancelled: {} }; break;
+            }
+
+            // Map Codama types to our Listing interface
+            return {
+                seller: toV1PublicKey(data.seller),
+                eventConfig: toV1PublicKey(data.eventConfig),
+                ticketId: data.ticketId,
+                ownerCommitment: Array.from(data.ticketCommitment),
+                encryptedSecret: Array.from(data.encryptedSecret),
+                priceLamports: data.priceLamports,
+                buyer: (data.buyer.__option === 'Some') ? toV1PublicKey(data.buyer.value) : null,
+                buyerCommitment: (data.buyerCommitment.__option === 'Some') ? Array.from(data.buyerCommitment.value) : null,
+                status: statusObj,
+                createdAt: data.createdAt,
+                bump: data.bump
+            };
         } catch {
             return null;
         }
     }
 
     async fetchAllListings(): Promise<ListingWithPubkey[]> {
-        return this.program.account.listing.all();
+        // Still using Anchor for GPA (all()) for now, but mapping to new V2 types
+        const listings = await this.program.account.listing.all();
+        return listings.map((l: any) => ({
+            publicKey: l.publicKey,
+            account: {
+                seller: l.account.seller,
+                eventConfig: l.account.eventConfig,
+                ticketId: l.account.ticketId,
+                ownerCommitment: l.account.ticketCommitment,
+                encryptedSecret: l.account.encryptedSecret,
+                priceLamports: BigInt(l.account.priceLamports.toString()),
+                buyer: l.account.buyer,
+                buyerCommitment: l.account.buyerCommitment,
+                status: l.account.status,
+                createdAt: BigInt(l.account.createdAt.toString()),
+                bump: l.account.bump
+            }
+        }));
     }
 
     async fetchActiveListings(): Promise<ListingWithPubkey[]> {

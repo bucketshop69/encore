@@ -90,13 +90,13 @@ export const EventDetail: FC = () => {
                 eventListings.map((l: ListingWithPubkey) => ({
                     pubkey: l.publicKey.toBase58(),
                     eventConfig: l.account.eventConfig.toBase58(),
-                    ticketId: l.account.ticketId.toNumber(),
+                    ticketId: l.account.ticketId,
                     seller: l.account.seller.toBase58(),
-                    pricePerTicket: l.account.pricePerTicket.toNumber(),
+                    pricePerTicket: Number(l.account.priceLamports),
                     buyer: l.account.buyer ? l.account.buyer.toBase58() : null,
-                    buyerCommitment: l.account.buyerCommitment,
+                    buyerCommitment: l.account.buyerCommitment ? Array.from(l.account.buyerCommitment) : null,
                     encryptedSecret: Array.from(l.account.encryptedSecret),
-                    createdAt: l.account.createdAt.toNumber(),
+                    createdAt: Number(l.account.createdAt),
                 }))
             );
 

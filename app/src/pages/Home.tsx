@@ -43,7 +43,7 @@ export const Home: FC = () => {
                 location: e.account.eventLocation,
                 totalSupply: e.account.maxSupply,
                 ticketsMinted: e.account.ticketsMinted,
-                timestamp: e.account.eventTimestamp ? e.account.eventTimestamp.toNumber() : 0,
+                timestamp: e.account.eventTimestamp ? Number(e.account.eventTimestamp) : 0,
                 authority: e.account.authority.toBase58(),
             }));
 
