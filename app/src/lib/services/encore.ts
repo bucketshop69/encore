@@ -8,6 +8,47 @@ import * as commitment from "./commitment";
 // Import IDL JSON directly
 import encoreIdl from "../../../../target/idl/encore.json";
 
+// Event account type from IDL
+export interface EventConfig {
+    authority: PublicKey;
+    maxSupply: number;
+    ticketsMinted: number;
+    resaleCapBps: number;
+    eventName: string;
+    eventLocation: string;
+    eventDescription: string;
+    maxTicketsPerPerson: number; // u8
+    eventTimestamp: BN;
+    createdAt: BN;
+    updatedAt: BN;
+    bump: number;
+}
+
+// Listing account type
+export interface Listing {
+    seller: PublicKey;
+    eventConfig: PublicKey;
+    ticketId: BN;
+    ownerCommitment: number[];
+    encryptedSecret: number[];
+    pricePerTicket: BN;
+    buyer: PublicKey | null;
+    buyerCommitment: number[] | null;
+    status: { active: object } | { claimed: object } | { sold: object } | { cancelled: object };
+    createdAt: BN;
+    bump: number;
+}
+
+export interface EventWithPubkey {
+    publicKey: PublicKey;
+    account: EventConfig;
+}
+
+export interface ListingWithPubkey {
+    publicKey: PublicKey;
+    account: Listing;
+}
+
 /**
  * Encore client for interacting with the program
  */
@@ -15,8 +56,10 @@ export class EncoreClient {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     program: any;
     programId: PublicKey;
+    provider: AnchorProvider;
 
     constructor(provider: AnchorProvider) {
+        this.provider = provider;
         this.programId = new PublicKey(CONFIG.PROGRAM_ID);
         this.program = new Program(encoreIdl as Idl, provider);
     }
@@ -33,12 +76,47 @@ export class EncoreClient {
         return pda;
     }
 
-    async fetchEvent(eventConfig: PublicKey) {
-        return this.program.account.eventConfig.fetch(eventConfig);
+    async fetchEvent(eventConfig: PublicKey): Promise<EventConfig | null> {
+        try {
+            return await this.program.account.eventConfig.fetch(eventConfig);
+        } catch {
+            return null;
+        }
     }
 
-    async fetchAllEvents() {
+    async fetchAllEvents(): Promise<EventWithPubkey[]> {
         return this.program.account.eventConfig.all();
+    }
+
+    async createEvent(
+        authority: PublicKey,
+        name: string,
+        location: string,
+        description: string,
+        maxSupply: number,
+        resaleCapBps: number,
+        maxTicketsPerPerson: number,
+        timestamp: number // unix timestamp in seconds
+    ): Promise<string> {
+        const eventConfig = this.getEventConfigPda(authority);
+
+        const tx = await this.program.methods
+            .createEvent(
+                new BN(maxSupply),
+                new BN(resaleCapBps),
+                name,
+                location,
+                description,
+                maxTicketsPerPerson,
+                new BN(timestamp)
+            )
+            .accountsPartial({
+                authority,
+                eventConfig,
+            })
+            .rpc();
+
+        return tx;
     }
 
     // ============================================
@@ -46,12 +124,15 @@ export class EncoreClient {
     // ============================================
 
     async mintTicket(
+        eventConfig: PublicKey,
         buyer: PublicKey,
-        eventOwner: PublicKey,
         ownerCommitment: Uint8Array,
-        purchasePrice: BN
-    ) {
-        const eventConfig = this.getEventConfigPda(eventOwner);
+        priceLamports: BN
+    ): Promise<{ txSig: string; ticketSeed: Uint8Array }> {
+        // Get event to find authority
+        const event = await this.fetchEvent(eventConfig);
+        if (!event) throw new Error("Event not found");
+
         const ticketSeed = commitment.generateRandomSecret();
         const ticketAddress = light.deriveTicketAddress(ticketSeed, this.programId);
         const proofResult = await light.getValidityProof([ticketAddress]);
@@ -63,28 +144,27 @@ export class EncoreClient {
             addressTreeIndex
         );
 
-        return {
-            tx: this.program.methods
-                .mintTicket(
-                    { 0: proofResult.compressedProof },
-                    addressTreeInfo,
-                    outputStateTreeIndex,
-                    Array.from(ownerCommitment),
-                    purchasePrice,
-                    Array.from(ticketSeed)
-                )
-                .accountsPartial({
-                    buyer,
-                    eventOwner,
-                    eventConfig,
-                })
-                .preInstructions([
-                    ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
-                ])
-                .remainingAccounts(remainingAccounts),
-            ticketSeed,
-            ticketAddress,
-        };
+        const tx = await this.program.methods
+            .mintTicket(
+                { 0: proofResult.compressedProof },
+                addressTreeInfo,
+                outputStateTreeIndex,
+                Array.from(ownerCommitment),
+                priceLamports,
+                Array.from(ticketSeed)
+            )
+            .accountsPartial({
+                buyer,
+                eventOwner: event.authority,
+                eventConfig,
+            })
+            .preInstructions([
+                ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+            ])
+            .remainingAccounts(remainingAccounts)
+            .rpc();
+
+        return { txSig: tx, ticketSeed };
     }
 
     // ============================================
@@ -100,47 +180,66 @@ export class EncoreClient {
     }
 
     async createListing(
+        eventConfig: PublicKey,
+        ticketId: number,
         seller: PublicKey,
         ticketCommitment: Uint8Array,
         secret: Uint8Array,
-        priceLamports: BN,
-        eventConfig: PublicKey,
-        ticketId: number
-    ) {
+        priceLamports: number
+    ): Promise<{ txSig: string; listingPda: PublicKey }> {
         const listingPda = this.getListingPda(seller, ticketCommitment);
         const encryptedSecret = commitment.encryptSecret(secret, listingPda.toBytes());
         const ticketAddressSeed = commitment.generateRandomSecret();
 
-        return {
-            tx: this.program.methods
-                .createListing(
-                    Array.from(ticketCommitment),
-                    Array.from(encryptedSecret),
-                    priceLamports,
-                    eventConfig,
-                    ticketId,
-                    Array.from(ticketAddressSeed),
-                    0
-                )
-                .accountsPartial({
-                    seller,
-                    listing: listingPda,
-                }),
-            listingPda,
-        };
+        const tx = await this.program.methods
+            .createListing(
+                Array.from(ticketCommitment),
+                Array.from(encryptedSecret),
+                new BN(priceLamports),
+                eventConfig,
+                ticketId,
+                Array.from(ticketAddressSeed),
+                0
+            )
+            .accountsPartial({
+                seller,
+                listing: listingPda,
+            })
+            .rpc();
+
+        return { txSig: tx, listingPda };
     }
 
-    async claimListing(buyer: PublicKey, listingPda: PublicKey, buyerCommitment: Uint8Array) {
+    async claimListing(
+        listingPda: PublicKey,
+        buyer: PublicKey,
+        buyerCommitment: Uint8Array
+    ): Promise<string> {
         return this.program.methods
             .claimListing(Array.from(buyerCommitment))
-            .accountsPartial({ buyer, listing: listingPda });
+            .accountsPartial({ buyer, listing: listingPda })
+            .rpc();
     }
 
-    async cancelListing(seller: PublicKey, listingPda: PublicKey) {
-        return this.program.methods.cancelListing().accountsPartial({ seller, listing: listingPda });
+    async cancelListing(listingPda: PublicKey, seller: PublicKey): Promise<string> {
+        return this.program.methods
+            .cancelListing()
+            .accountsPartial({ seller, listing: listingPda })
+            .rpc();
     }
 
-    async completeSale(seller: PublicKey, listingPda: PublicKey, sellerSecret: Uint8Array) {
+    async completeSale(
+        _eventConfig: PublicKey,
+        _ticketId: number,
+        seller: PublicKey,
+        buyer: PublicKey,
+        sellerSecret: Uint8Array,
+        _buyerCommitment: Uint8Array
+    ): Promise<{ txSig: string; newTicketSeed: Uint8Array }> {
+        // Compute seller's commitment from their secret
+        const sellerCommitment = commitment.computeCommitment(seller, sellerSecret);
+        const listingPda = this.getListingPda(seller, sellerCommitment);
+
         const nullifierAddress = light.deriveNullifierAddress(sellerSecret, this.programId);
         const newTicketSeed = commitment.generateRandomSecret();
         const newTicketAddress = light.deriveTicketAddress(newTicketSeed, this.programId);
@@ -150,36 +249,41 @@ export class EncoreClient {
         const { remainingAccounts } = packed.toAccountMetas();
         const addressTreeInfo = light.buildAddressTreeInfo(proofResult.rootIndices[0], addressTreeIndex);
 
-        return {
-            tx: this.program.methods
-                .completeSale(
-                    { 0: proofResult.compressedProof },
-                    addressTreeInfo,
-                    outputStateTreeIndex,
-                    Array.from(newTicketSeed),
-                    0,
-                    Array.from(sellerSecret)
-                )
-                .accountsPartial({ seller, listing: listingPda })
-                .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 })])
-                .remainingAccounts(remainingAccounts),
-            nullifierAddress,
-            newTicketAddress,
-            newTicketSeed,
-        };
+        const tx = await this.program.methods
+            .completeSale(
+                { 0: proofResult.compressedProof },
+                addressTreeInfo,
+                outputStateTreeIndex,
+                Array.from(newTicketSeed),
+                0,
+                Array.from(sellerSecret)
+            )
+            .accountsPartial({
+                seller,
+                buyer,
+                listing: listingPda
+            })
+            .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 })])
+            .remainingAccounts(remainingAccounts)
+            .rpc();
+
+        return { txSig: tx, newTicketSeed };
     }
 
-    async fetchListing(listingPda: PublicKey) {
-        return this.program.account.listing.fetch(listingPda);
+    async fetchListing(listingPda: PublicKey): Promise<Listing | null> {
+        try {
+            return await this.program.account.listing.fetch(listingPda);
+        } catch {
+            return null;
+        }
     }
 
-    async fetchAllListings() {
+    async fetchAllListings(): Promise<ListingWithPubkey[]> {
         return this.program.account.listing.all();
     }
 
-    async fetchActiveListings() {
+    async fetchActiveListings(): Promise<ListingWithPubkey[]> {
         const all = await this.fetchAllListings();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return all.filter((l: any) => l.account.status && "active" in l.account.status);
+        return all.filter((l) => l.account.status && "active" in l.account.status);
     }
 }

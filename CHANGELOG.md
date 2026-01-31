@@ -2,11 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2026-01-31
+
+### UI/UX Overhaul - "Industrial Rave" Theme (Issue #016 - ✅ COMPLETE)
+
+- **Premium Visual Identity**
+
+  - **Color Palette**: Deep Black (`#09090b`) background with Acid Green (`#CCFF00`) accents
+  - **Typography**: "Itim" (Handwritten style) for headers and "Space Mono" for distinct, technical data
+  - **Component Styling**: Dark, neutral surfaces with high-contrast interactions (hover states)
+  - **Wallet Integration**: Custom styling for wallet adapter buttons and modals to match the theme (neutral default, acid green active/hover)
+
+- **Enhanced User Experience**
+  - **"Connect & Action" Patterns**:
+    - **Create Event**: Modal allows non-connected users to see the form; "Create" button automatically triggers wallet connection
+    - **Buy Ticket**: "Buy" buttons in Hero and Marketplace initiate wallet connection if disconnected
+    - **Seamless Access**: Users can explore the app (Home, Details, Marketplace) without prior connection
+  - **Optimized Layouts**:
+    - **Create Event Modal**: Wider layout (`max-width: 650px`), combined row inputs (Location/Date, 3-column Ticket Details), improved padding and alignment
+    - **Event Detail Hero**: "Buy Ticket" CTA moved to the main hero card for better conversion visibility
+    - **Responsive Design**: Fixed body layout issues (`display: flex` removal) and input box alignment (`box-sizing` fix)
+
+---
+
 ## [0.3.2] - 2026-01-31
 
 ### Added
 
 - **UI Core Services** (Issue #012 - ✅ COMPLETE)
+
   - `commitment.ts` - Secret generation, commitment computation (SHA256), encryption/decryption
   - `light.ts` - Light Protocol SDK wrappers (validity proofs, packed accounts, address derivation)
   - `encore.ts` - EncoreClient class with all program methods (Anchor + web3.js)
@@ -31,6 +55,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **Marketplace with Light Protocol CPI** (Issue #010 - ✅ COMPLETE)
+
   - `complete_sale` instruction with full Light Protocol CPI integration
   - Creates nullifier atomically to prevent double-spend
   - Creates new ticket with buyer's commitment in same transaction
@@ -38,6 +63,7 @@ All notable changes to this project will be documented in this file.
   - All marketplace tests passing on devnet (8/8 tests)
 
 - **Marketplace Test Coverage**
+
   - `test_create_listing` - Seller lists ticket with encrypted secret
   - `test_claim_listing` - Buyer locks listing with commitment
   - `test_complete_sale` - Full Light Protocol CPI with nullifier + ticket creation
@@ -62,6 +88,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - **Commitment + Nullifier Privacy Model** (Issue #009 - ✅ COMPLETE)
+
   - Replaced ephemeral key model with commitment-based ownership
   - `owner_commitment = SHA256(owner_pubkey || secret)` hides ticket owner
   - CREATE-only operations avoid devnet indexer issues with burns/mutations
@@ -119,20 +146,24 @@ All notable changes to this project will be documented in this file.
   - `TicketMinted` event emits commitment (not owner pubkey)
 
 - **Privacy Model**
+
   - Ticket ownership hidden from on-chain observers
   - Organizer only receives commitment, never sees recipient identity
   - Foundation for ZK proof-based ownership verification
 
 - **Rust Integration Tests**
+
   - `test_create_event` - EventConfig PDA creation
   - `test_mint_private_ticket` - Private ticket minting with commitment
   - `test_mint_ticket_fails_max_supply` - Supply limit enforcement
 
 - **Light Protocol Infrastructure**
+
   - Light CLI installed for test infrastructure
   - `light-program-test` integration for Rust tests
 
 - **Private Ticket Transfer** (Issue #003 - ✅ COMPLETE with V2 Nullifiers)
+
   - `transfer_ticket` instruction for privacy-preserving ownership transfers
   - **Ownership Proof**: Seller reveals pubkey + secret to prove ownership
   - **Privacy Preserved**: Buyer commitment stays private, no identity revealed
@@ -147,6 +178,7 @@ All notable changes to this project will be documented in this file.
   - **Integration Tests**: `test_transfer_ticket` validates full transfer flow with nullifier
 
 - **V2 Migration** (2026-01-20)
+
   - ✅ Enabled `v2` feature for `light-program-test` in dev dependencies
   - ✅ Added V2 address tree validation in both mint and transfer instructions
   - ✅ Imports `ADDRESS_TREE_V2` constant from `light-sdk-types`
@@ -156,12 +188,14 @@ All notable changes to this project will be documented in this file.
   - ✅ Removed debug log messages from production code
 
 - **Security Testing** (Issue #004 - ✅ COMPLETE)
+
   - ✅ Added `test_prevent_double_spend` integration test
   - ✅ Demonstrates nullifier prevents reusing same ticket transfer
   - ✅ Validates security guarantee: attempting second transfer with same secret fails
   - ✅ Clear error messaging for security failures
 
 - **Privacy Refactor: Ephemeral Keys** (2026-01-26 - ✅ COMPLETE)
+
   - Refactored `PrivateTicket` to use `owner: Pubkey` (Ephemeral Key/Stealth Address) instead of hash commitment
   - Updated `mint_ticket` to accept ephemeral public key directly
   - Updated `transfer_ticket` to transfer from current ephemeral keypair to new ephemeral public key

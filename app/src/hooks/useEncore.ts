@@ -5,18 +5,31 @@ import { EncoreClient } from "../lib/services/encore";
 
 /**
  * Hook to get Encore client instance
- * Returns null if wallet not connected
+ * Works without wallet for read-only operations (fetching events/listings)
+ * Wallet needed for transactions (mint, list, buy)
  */
 export function useEncore(): EncoreClient | null {
     const { connection } = useConnection();
     const wallet = useAnchorWallet();
 
     const client = useMemo(() => {
-        if (!wallet) return null;
-
-        const provider = new AnchorProvider(connection, wallet, {
-            commitment: "confirmed",
-        });
+        // Create a read-only provider if no wallet
+        // This allows fetching events without connecting
+        const provider = wallet
+            ? new AnchorProvider(connection, wallet, { commitment: "confirmed" })
+            : new AnchorProvider(
+                connection,
+                {
+                    publicKey: null as unknown as import("@solana/web3.js").PublicKey,
+                    signTransaction: async () => {
+                        throw new Error("Wallet not connected");
+                    },
+                    signAllTransactions: async () => {
+                        throw new Error("Wallet not connected");
+                    },
+                },
+                { commitment: "confirmed" }
+            );
 
         return new EncoreClient(provider);
     }, [connection, wallet]);

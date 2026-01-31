@@ -14,8 +14,14 @@ export const CONFIG = {
     CLUSTER: "devnet" as const,
 };
 
+// Export individual values for convenience
+export const RPC_URL = CONFIG.RPC_URL;
+export const PROGRAM_ID = CONFIG.PROGRAM_ID;
+export const ADDRESS_TREE = CONFIG.ADDRESS_TREE;
+
 // LocalStorage keys
 export const STORAGE_KEYS = {
-    TICKETS: "encore_tickets",
+    TICKETS_PREFIX: "encore_tickets_",
+    CLAIMS_PREFIX: "encore_claims_",
     WALLET: "encore_wallet",
 };
