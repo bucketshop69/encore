@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-01-31
+
+### Added
+
+- **UI Core Services** (Issue #012 - ✅ COMPLETE)
+  - `commitment.ts` - Secret generation, commitment computation (SHA256), encryption/decryption
+  - `light.ts` - Light Protocol SDK wrappers (validity proofs, packed accounts, address derivation)
+  - `encore.ts` - EncoreClient class with all program methods (Anchor + web3.js)
+  - `useEncore.ts` - React hook for EncoreClient instance
+  - `config.ts` - RPC_URL, PROGRAM_ID, ADDRESS_TREE constants
+
+- **Vite + React + TypeScript Frontend**
+  - Clean TypeScript build with `verbatimModuleSyntax`
+  - Anchor Program integration (IDL imported as JSON)
+  - Light Protocol SDK v0.22.1-alpha.1 integration
+
+### Technical Decisions
+
+- Used manual Anchor wrapper instead of Codama (Codama generates @solana/kit code, incompatible with Anchor)
+- All program methods return transaction signatures for confirmation
+- Commitment utilities use Web Crypto API (browser-native)
+
+---
+
 ## [0.3.1] - 2026-01-31
 
 ### Added

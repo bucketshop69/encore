@@ -5,11 +5,14 @@
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
   "dependencies": {
+    "@codama/nodes-from-anchor": "^1.3.8",
+    "@codama/renderers-js": "^1.6.2",
     "@coral-xyz/anchor": "^0.31.1",
     "@lightprotocol/compressed-token": "^0.22.0",
     "@lightprotocol/stateless.js": "^0.22.1-alpha.1",
     "@solana/web3.js": "^1.95.8",
     "bn.js": "^5.2.2",
+    "codama": "^1.5.0",
     "dotenv": "^17.2.3",
     "privacycash": "^1.1.12"
   },
