@@ -58,5 +58,25 @@ pub enum EncoreError {
 
     #[msg("Ticket has already been spent")]
     TicketAlreadySpent,
-}
 
+    #[msg("Listing not active")]
+    ListingNotActive,
+
+    #[msg("Listing already claimed")]
+    ListingAlreadyClaimed,
+
+    #[msg("Listing not claimed")]
+    ListingNotClaimed,
+
+    #[msg("Not the listing seller")]
+    NotSeller,
+
+    #[msg("Not the listing buyer")]
+    NotBuyer,
+
+    #[msg("Claim timeout not reached")]
+    ClaimTimeoutNotReached,
+
+    #[msg("Invalid price")]
+    InvalidPrice,
+}

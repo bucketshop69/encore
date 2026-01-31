@@ -90,4 +90,58 @@ pub mod encore {
             resale_price,
         )
     }
+
+    pub fn create_listing(
+        ctx: Context<CreateListing>,
+        ticket_commitment: [u8; 32],
+        encrypted_secret: [u8; 32],
+        price_lamports: u64,
+        event_config: Pubkey,
+        ticket_id: u32,
+        ticket_address_seed: [u8; 32],
+        ticket_bump: u8,
+    ) -> Result<()> {
+        instructions::create_listing(
+            ctx,
+            ticket_commitment,
+            encrypted_secret,
+            price_lamports,
+            event_config,
+            ticket_id,
+            ticket_address_seed,
+            ticket_bump,
+        )
+    }
+
+    pub fn claim_listing(ctx: Context<ClaimListing>, buyer_commitment: [u8; 32]) -> Result<()> {
+        instructions::claim_listing(ctx, buyer_commitment)
+    }
+
+    pub fn complete_sale<'info>(
+        ctx: Context<'_, '_, '_, 'info, CompleteSale<'info>>,
+        proof: ValidityProof,
+        address_tree_info: PackedAddressTreeInfo,
+        output_state_tree_index: u8,
+        new_ticket_address_seed: [u8; 32],
+        ticket_bump: u8,
+        seller_secret: [u8; 32],
+    ) -> Result<()> {
+        instructions::complete_sale(
+            ctx,
+            proof,
+            address_tree_info,
+            output_state_tree_index,
+            new_ticket_address_seed,
+            ticket_bump,
+            seller_secret,
+        )
+    }
+
+    pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
+        instructions::cancel_listing(ctx)
+    }
+
+    pub fn release_claim(ctx: Context<ReleaseClaim>) -> Result<()> {
+        instructions::release_claim(ctx)
+    }
 }
