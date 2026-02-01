@@ -90,12 +90,6 @@ pub fn complete_sale<'info>(
         EncoreError::NotTicketOwner
     );
 
-    msg!("Seller pubkey: {:?}", seller.key());
-    msg!(
-        "Computed commitment (first 8): {:?}",
-        &computed_commitment.to_bytes()[..8]
-    );
-
     // Get buyer commitment from listing (must be set during claim)
     let buyer_commitment = listing
         .buyer_commitment

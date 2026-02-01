@@ -77,10 +77,6 @@ pub fn mint_ticket<'info>(
     }
 
     // --- Private Ticket Logic ---
-    msg!(
-        "Rust: Ticket address seed (first 8): {:?}",
-        &ticket_address_seed[..8]
-    );
     let (ticket_address, ticket_seed) = derive_address(
         &[
             TICKET_SEED,

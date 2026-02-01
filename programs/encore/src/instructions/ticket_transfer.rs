@@ -73,13 +73,7 @@ pub fn transfer_ticket<'info>(
     let mut commitment_input = Vec::with_capacity(64);
     commitment_input.extend_from_slice(seller.key().as_ref());
     commitment_input.extend_from_slice(&seller_secret);
-    let computed_commitment = hash(&commitment_input);
-
-    msg!("Owner pubkey: {:?}", seller.key());
-    msg!(
-        "Computed commitment (first 8): {:?}",
-        &computed_commitment.to_bytes()[..8]
-    );
+    let _computed_commitment = hash(&commitment_input);
 
     // The commitment is verified implicitly via the proof - the ticket with this
     // commitment must exist for the proof to be valid. The CPI will fail if the
