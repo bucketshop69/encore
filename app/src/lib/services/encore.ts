@@ -8,7 +8,6 @@ import * as commitment from "./commitment";
 import {
     getCreateEventInstruction,
     getCreateListingInstruction,
-    getClaimListingInstruction,
     getCancelListingInstruction,
     fetchEventConfig,
     fetchListing,
@@ -16,8 +15,8 @@ import {
 } from "../../client";
 import { asSigner, toV2Address, toV1Instruction, toV1PublicKey } from "./adapter";
 
-// Import IDL JSON directly
-import encoreIdl from "../../../../target/idl/encore.json";
+// Import IDL JSON directly (copied to app/src/idl for Vercel build)
+import encoreIdl from "../../idl/encore.json";
 
 // Event account type - Mapped to Codama Types (Native BigInt)
 export interface EventConfig {
@@ -337,7 +336,7 @@ export class EncoreClient {
         _eventConfig: PublicKey,
         _ticketId: number,
         seller: PublicKey,
-        buyer: PublicKey,
+        _buyer: PublicKey,
         sellerSecret: Uint8Array,
         _buyerCommitment: Uint8Array
     ): Promise<{ txSig: string; newTicketSeed: Uint8Array }> {

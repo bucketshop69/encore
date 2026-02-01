@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2026-02-01
+
+### Documentation & Demo Improvements
+
+- **README Overhaul**
+  - New external-facing README with ASCII flow diagram
+  - "Try It" section with 4 commands to run demo
+  - Key concepts table (Compressed Accounts, Commitment, Nullifier, Escrow)
+  - Sample test output showing what users will see
+  - Old README preserved in `docs/ARCHITECTURE.md`
+
+- **Test Output with Explorer Links**
+  - Rewrote `marketplace-roundtrip.ts` as a demo with full addresses
+  - Added `explorerAccountUrl()` and `explorerTxUrl()` helpers
+  - All tickets, nullifiers, listings printed with Solana Explorer links
+  - Visual formatting with headers, dividers, and emoji
+  - Transaction summary at end for easy verification
+
+- **Security: Remove Sensitive Logs**
+  - Removed commitment fragments from `ticket_mint.rs`
+  - Removed seller pubkey and commitment logs from `listing_complete.rs`
+  - Removed owner pubkey and commitment logs from `ticket_transfer.rs`
+  - On-chain logs now show only safe operational messages
+
+- **Vercel Build Fix**
+  - Copied IDL to `app/src/idl/encore.json` (Vercel can't access `target/`)
+  - Fixed unused import `getClaimListingInstruction`
+  - Fixed unused variable `buyer` → `_buyer`
+
+---
+
 ## [0.6.1] - 2026-02-01
 
 ### UI Escrow Flow Integration (Issue #018 - ✅ COMPLETE)

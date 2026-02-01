@@ -1,0 +1,1573 @@
+{
+  "address": "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V",
+  "metadata": {
+    "name": "encore",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Private ZK Ticketing System on Solana"
+  },
+  "instructions": [
+    {
+      "name": "cancel_claim",
+      "discriminator": [
+        179,
+        1,
+        212,
+        49,
+        81,
+        144,
+        221,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "docs": [
+            "Buyer who is cancelling their claim"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being unclaimed"
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow PDA holding buyer's payment (will be refunded)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_listing",
+      "discriminator": [
+        41,
+        183,
+        50,
+        232,
+        230,
+        233,
+        157,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who is cancelling the listing"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being cancelled - will be closed and rent returned to seller"
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_listing",
+      "discriminator": [
+        96,
+        238,
+        149,
+        85,
+        208,
+        136,
+        248,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "docs": [
+            "Buyer who is claiming the listing"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being claimed"
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow PDA to hold payment"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "buyer_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_listing",
+      "discriminator": [
+        33,
+        15,
+        192,
+        81,
+        78,
+        175,
+        159,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who owns the listing"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being closed - rent returned to seller"
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "complete_sale",
+      "discriminator": [
+        212,
+        87,
+        122,
+        108,
+        63,
+        103,
+        44,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who is completing the sale"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being completed"
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow PDA holding buyer's payment"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": {
+              "name": "ValidityProof"
+            }
+          }
+        },
+        {
+          "name": "address_tree_info",
+          "type": {
+            "defined": {
+              "name": "PackedAddressTreeInfo"
+            }
+          }
+        },
+        {
+          "name": "output_state_tree_index",
+          "type": "u8"
+        },
+        {
+          "name": "new_ticket_address_seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ticket_bump",
+          "type": "u8"
+        },
+        {
+          "name": "seller_secret",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_event",
+      "discriminator": [
+        49,
+        219,
+        29,
+        203,
+        22,
+        98,
+        100,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_supply",
+          "type": "u32"
+        },
+        {
+          "name": "resale_cap_bps",
+          "type": "u32"
+        },
+        {
+          "name": "event_name",
+          "type": "string"
+        },
+        {
+          "name": "event_location",
+          "type": "string"
+        },
+        {
+          "name": "event_description",
+          "type": "string"
+        },
+        {
+          "name": "max_tickets_per_person",
+          "type": "u8"
+        },
+        {
+          "name": "event_timestamp",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "create_listing",
+      "discriminator": [
+        18,
+        168,
+        45,
+        24,
+        191,
+        31,
+        117,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who is listing the ticket"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing account to be created"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller"
+              },
+              {
+                "kind": "arg",
+                "path": "ticket_commitment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "ticket_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "encrypted_secret",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "price_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "event_config",
+          "type": "pubkey"
+        },
+        {
+          "name": "ticket_id",
+          "type": "u32"
+        },
+        {
+          "name": "ticket_address_seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "ticket_bump",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "mint_ticket",
+      "discriminator": [
+        159,
+        167,
+        223,
+        60,
+        138,
+        6,
+        23,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "docs": [
+            "The buyer who is purchasing the ticket"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event_owner"
+        },
+        {
+          "name": "event_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": {
+              "name": "ValidityProof"
+            }
+          }
+        },
+        {
+          "name": "address_tree_info",
+          "type": {
+            "defined": {
+              "name": "PackedAddressTreeInfo"
+            }
+          }
+        },
+        {
+          "name": "output_state_tree_index",
+          "type": "u8"
+        },
+        {
+          "name": "owner_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "purchase_price",
+          "type": "u64"
+        },
+        {
+          "name": "ticket_address_seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "release_claim",
+      "discriminator": [
+        109,
+        194,
+        80,
+        47,
+        30,
+        93,
+        16,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who is releasing the claim"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being released"
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "seller_cancel_claim",
+      "discriminator": [
+        59,
+        21,
+        234,
+        12,
+        167,
+        61,
+        254,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "Seller who is cancelling the claim"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "Listing being unclaimed"
+          ],
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow PDA holding buyer's payment (will be refunded to buyer)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "listing"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "docs": [
+            "Buyer who will receive the refund"
+          ],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_ticket",
+      "docs": [
+        "Transfer ticket using Commitment + Nullifier pattern.",
+        "- Seller reveals secret to prove ownership",
+        "- Creates nullifier (prevents double-spend)",
+        "- Creates new ticket with buyer's commitment"
+      ],
+      "discriminator": [
+        191,
+        184,
+        74,
+        239,
+        164,
+        172,
+        188,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "docs": [
+            "The seller who is transferring (also pays fees)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event_owner"
+        },
+        {
+          "name": "event_config",
+          "docs": [
+            "Event config to check resale cap"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event_owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "proof",
+          "type": {
+            "defined": {
+              "name": "ValidityProof"
+            }
+          }
+        },
+        {
+          "name": "address_tree_info",
+          "type": {
+            "defined": {
+              "name": "PackedAddressTreeInfo"
+            }
+          }
+        },
+        {
+          "name": "output_state_tree_index",
+          "type": "u8"
+        },
+        {
+          "name": "current_ticket_id",
+          "type": "u32"
+        },
+        {
+          "name": "current_original_price",
+          "type": "u64"
+        },
+        {
+          "name": "seller_secret",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_owner_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_ticket_address_seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "resale_price",
+          "type": {
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_event",
+      "discriminator": [
+        70,
+        108,
+        211,
+        125,
+        171,
+        176,
+        25,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "event_config"
+          ]
+        },
+        {
+          "name": "event_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "resale_cap_bps",
+          "type": {
+            "option": "u32"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EventConfig",
+      "discriminator": [
+        85,
+        63,
+        74,
+        243,
+        198,
+        192,
+        138,
+        0
+      ]
+    },
+    {
+      "name": "Listing",
+      "discriminator": [
+        218,
+        32,
+        50,
+        73,
+        43,
+        134,
+        26,
+        58
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "EventCreated",
+      "discriminator": [
+        59,
+        186,
+        199,
+        175,
+        242,
+        25,
+        238,
+        94
+      ]
+    },
+    {
+      "name": "EventUpdated",
+      "discriminator": [
+        238,
+        86,
+        17,
+        103,
+        12,
+        182,
+        141,
+        61
+      ]
+    },
+    {
+      "name": "Nullifier",
+      "discriminator": [
+        67,
+        115,
+        100,
+        195,
+        51,
+        76,
+        207,
+        116
+      ]
+    },
+    {
+      "name": "PrivateTicket",
+      "discriminator": [
+        93,
+        9,
+        77,
+        57,
+        58,
+        23,
+        7,
+        68
+      ]
+    },
+    {
+      "name": "SaleCompleted",
+      "discriminator": [
+        162,
+        169,
+        254,
+        122,
+        89,
+        180,
+        31,
+        84
+      ]
+    },
+    {
+      "name": "TicketMinted",
+      "discriminator": [
+        22,
+        17,
+        212,
+        38,
+        91,
+        144,
+        104,
+        109
+      ]
+    },
+    {
+      "name": "TicketTransferred",
+      "discriminator": [
+        24,
+        154,
+        61,
+        145,
+        95,
+        79,
+        109,
+        70
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidTicketSupply",
+      "msg": "Ticket supply must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "TicketSupplyTooLarge",
+      "msg": "Ticket supply exceeds maximum allowed"
+    },
+    {
+      "code": 6002,
+      "name": "ResaleCapTooLow",
+      "msg": "Resale cap must be at least 1.0x (10000 basis points)"
+    },
+    {
+      "code": 6003,
+      "name": "ResaleCapTooHigh",
+      "msg": "Resale cap exceeds maximum allowed (10.0x)"
+    },
+    {
+      "code": 6004,
+      "name": "EventNameTooLong",
+      "msg": "Event name exceeds maximum length"
+    },
+    {
+      "code": 6005,
+      "name": "EventLocationTooLong",
+      "msg": "Event location exceeds maximum length"
+    },
+    {
+      "code": 6006,
+      "name": "EventDescriptionTooLong",
+      "msg": "Event description exceeds maximum length"
+    },
+    {
+      "code": 6007,
+      "name": "EventNameEmpty",
+      "msg": "Event name cannot be empty"
+    },
+    {
+      "code": 6008,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: signer is not the event authority"
+    },
+    {
+      "code": 6009,
+      "name": "EventTimestampInPast",
+      "msg": "Event timestamp must be in the future"
+    },
+    {
+      "code": 6010,
+      "name": "MaxSupplyReached",
+      "msg": "Maximum ticket supply reached"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidPurchasePrice",
+      "msg": "Purchase price must be greater than zero"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidAddressTree",
+      "msg": "Invalid address tree"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidTicket",
+      "msg": "Invalid ticket account"
+    },
+    {
+      "code": 6014,
+      "name": "NotTicketOwner",
+      "msg": "Seller does not own this ticket"
+    },
+    {
+      "code": 6015,
+      "name": "ExceedsResaleCap",
+      "msg": "Resale price exceeds allowed cap"
+    },
+    {
+      "code": 6016,
+      "name": "TicketAlreadyTransferred",
+      "msg": "Ticket already transferred (nullifier exists)"
+    },
+    {
+      "code": 6017,
+      "name": "MaxTicketsPerPersonReached",
+      "msg": "Maximum tickets per person reached for this event"
+    },
+    {
+      "code": 6018,
+      "name": "TicketAlreadySpent",
+      "msg": "Ticket has already been spent"
+    },
+    {
+      "code": 6019,
+      "name": "ListingNotActive",
+      "msg": "Listing not active"
+    },
+    {
+      "code": 6020,
+      "name": "ListingAlreadyClaimed",
+      "msg": "Listing already claimed"
+    },
+    {
+      "code": 6021,
+      "name": "ListingNotClaimed",
+      "msg": "Listing not claimed"
+    },
+    {
+      "code": 6022,
+      "name": "NotSeller",
+      "msg": "Not the listing seller"
+    },
+    {
+      "code": 6023,
+      "name": "NotBuyer",
+      "msg": "Not the listing buyer"
+    },
+    {
+      "code": 6024,
+      "name": "ClaimTimeoutNotReached",
+      "msg": "Claim timeout not reached"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidPrice",
+      "msg": "Invalid price"
+    },
+    {
+      "code": 6026,
+      "name": "ListingNotCancelled",
+      "msg": "Listing not cancelled or completed"
+    }
+  ],
+  "types": [
+    {
+      "name": "CompressedProof",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "a",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "b",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "c",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_supply",
+            "type": "u32"
+          },
+          {
+            "name": "tickets_minted",
+            "type": "u32"
+          },
+          {
+            "name": "resale_cap_bps",
+            "type": "u32"
+          },
+          {
+            "name": "event_name",
+            "type": "string"
+          },
+          {
+            "name": "event_location",
+            "type": "string"
+          },
+          {
+            "name": "event_description",
+            "type": "string"
+          },
+          {
+            "name": "max_tickets_per_person",
+            "type": "u8"
+          },
+          {
+            "name": "event_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_supply",
+            "type": "u32"
+          },
+          {
+            "name": "resale_cap_bps",
+            "type": "u32"
+          },
+          {
+            "name": "event_name",
+            "type": "string"
+          },
+          {
+            "name": "event_location",
+            "type": "string"
+          },
+          {
+            "name": "event_description",
+            "type": "string"
+          },
+          {
+            "name": "max_tickets_per_person",
+            "type": "u8"
+          },
+          {
+            "name": "event_timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "resale_cap_bps",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Listing",
+      "docs": [
+        "Marketplace listing for private ticket trading.",
+        "",
+        "Privacy: Seller and buyer identities are public, but ticket ownership",
+        "is hidden via commitment model. Only the seller knows their secret."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "seller",
+            "docs": [
+              "Seller who receives payment"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_commitment",
+            "docs": [
+              "The ticket being sold (commitment proves ownership)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_secret",
+            "docs": [
+              "Encrypted secret: secret XOR hash(listing_pda)",
+              "Allows seller to prove ownership without revealing secret"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price_lamports",
+            "docs": [
+              "Sale price in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "event_config",
+            "docs": [
+              "Which event this ticket belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_id",
+            "docs": [
+              "Which ticket ID within the event"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "buyer",
+            "docs": [
+              "Claim data"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "buyer_commitment",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "claimed_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status of the listing"
+            ],
+            "type": {
+              "defined": {
+                "name": "ListingStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "When the listing was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump for listing address derivation"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListingStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Claimed"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nullifier",
+      "docs": [
+        "Nullifier account - prevents double-spending of tickets.",
+        "",
+        "This is an empty struct - existence is the proof.",
+        "When a ticket is transferred:",
+        "1. Compute nullifier_seed = hash(\"nullifier\" || seller_secret)",
+        "2. CREATE nullifier account at derived address",
+        "3. If address already exists → transfer fails (double-spend prevented)",
+        "",
+        "The nullifier is derived from the seller's secret, which is unique per ticket."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PackedAddressTreeInfo",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "address_merkle_tree_pubkey_index",
+            "type": "u8"
+          },
+          {
+            "name": "address_queue_pubkey_index",
+            "type": "u8"
+          },
+          {
+            "name": "root_index",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrivateTicket",
+      "docs": [
+        "Private ticket stored as compressed account.",
+        "",
+        "Privacy: `owner_commitment` hides who owns the ticket.",
+        "Only the owner (who knows their secret) can prove ownership.",
+        "",
+        "Commitment = hash(owner_pubkey || secret)",
+        "- owner_pubkey: The actual owner's public key",
+        "- secret: Derived from wallet signature, unique per ticket"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_config",
+            "docs": [
+              "Link to parent event"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_id",
+            "docs": [
+              "Unique ticket identifier within the event"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "owner_commitment",
+            "docs": [
+              "Owner commitment: hash(owner_pubkey || secret)",
+              "Only the owner who knows their secret can prove ownership.",
+              "Secret is derived from: hash(wallet_sign(\"ticket:{ticket_id}:{event_config}\"))"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "original_price",
+            "docs": [
+              "Original mint price (public for resale cap calculation)"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SaleCompleted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "listing",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "event_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_id",
+            "type": "u32"
+          },
+          {
+            "name": "price_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketMinted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "purchase_price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_config",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidityProof",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "option": {
+              "defined": {
+                "name": "CompressedProof"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
