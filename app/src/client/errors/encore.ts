@@ -66,6 +66,8 @@ export const ENCORE_ERROR__NOT_BUYER = 0x1787; // 6023
 export const ENCORE_ERROR__CLAIM_TIMEOUT_NOT_REACHED = 0x1788; // 6024
 /** InvalidPrice: Invalid price */
 export const ENCORE_ERROR__INVALID_PRICE = 0x1789; // 6025
+/** ListingNotCancelled: Listing not cancelled or completed */
+export const ENCORE_ERROR__LISTING_NOT_CANCELLED = 0x178a; // 6026
 
 export type EncoreError =
   | typeof ENCORE_ERROR__CLAIM_TIMEOUT_NOT_REACHED
@@ -82,6 +84,7 @@ export type EncoreError =
   | typeof ENCORE_ERROR__INVALID_TICKET_SUPPLY
   | typeof ENCORE_ERROR__LISTING_ALREADY_CLAIMED
   | typeof ENCORE_ERROR__LISTING_NOT_ACTIVE
+  | typeof ENCORE_ERROR__LISTING_NOT_CANCELLED
   | typeof ENCORE_ERROR__LISTING_NOT_CLAIMED
   | typeof ENCORE_ERROR__MAX_SUPPLY_REACHED
   | typeof ENCORE_ERROR__MAX_TICKETS_PER_PERSON_REACHED
@@ -112,6 +115,7 @@ if (process.env.NODE_ENV !== 'production') {
     [ENCORE_ERROR__INVALID_TICKET_SUPPLY]: `Ticket supply must be greater than zero`,
     [ENCORE_ERROR__LISTING_ALREADY_CLAIMED]: `Listing already claimed`,
     [ENCORE_ERROR__LISTING_NOT_ACTIVE]: `Listing not active`,
+    [ENCORE_ERROR__LISTING_NOT_CANCELLED]: `Listing not cancelled or completed`,
     [ENCORE_ERROR__LISTING_NOT_CLAIMED]: `Listing not claimed`,
     [ENCORE_ERROR__MAX_SUPPLY_REACHED]: `Maximum ticket supply reached`,
     [ENCORE_ERROR__MAX_TICKETS_PER_PERSON_REACHED]: `Maximum tickets per person reached for this event`,

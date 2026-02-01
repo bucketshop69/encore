@@ -5,7 +5,7 @@ import { createSolanaRpc, type Rpc } from "@solana/kit";
 import { CONFIG } from "../config";
 import * as light from "./light";
 import * as commitment from "./commitment";
-import { 
+import {
     getCreateEventInstruction,
     getCreateListingInstruction,
     getClaimListingInstruction,
@@ -271,9 +271,9 @@ export class EncoreClient {
         buyerCommitment: Uint8Array
     ): Promise<string> {
         const inst = getClaimListingInstruction({
-             buyer: asSigner(toV2Address(buyer)),
-             listing: toV2Address(listingPda),
-             buyerCommitment: buyerCommitment
+            buyer: asSigner(toV2Address(buyer)),
+            listing: toV2Address(listingPda),
+            buyerCommitment: buyerCommitment
         });
         const tx = new Transaction().add(toV1Instruction(inst));
         return await this.provider.sendAndConfirm(tx);
@@ -285,6 +285,18 @@ export class EncoreClient {
             listing: toV2Address(listingPda)
         });
         const tx = new Transaction().add(toV1Instruction(inst));
+        return await this.provider.sendAndConfirm(tx);
+    }
+
+    async cancelClaim(listingPda: PublicKey, buyer: PublicKey): Promise<string> {
+        // Use Anchor program directly since Codama might not have this yet
+        const tx = await this.program.methods
+            .cancelClaim()
+            .accountsPartial({
+                buyer: buyer,
+                listing: listingPda,
+            })
+            .transaction();
         return await this.provider.sendAndConfirm(tx);
     }
 
@@ -335,7 +347,7 @@ export class EncoreClient {
             // Use Codama fetcher (Direct V2)
             const account = await fetchListing(this.rpc, toV2Address(listingPda));
             if (!account) return null;
-            
+
             const data = account.data;
             let statusObj: any = { active: {} };
             switch (data.status) {
@@ -387,6 +399,78 @@ export class EncoreClient {
 
     async fetchActiveListings(): Promise<ListingWithPubkey[]> {
         const all = await this.fetchAllListings();
-        return all.filter((l) => l.account.status && "active" in l.account.status);
+        // Include both active and claimed listings (exclude completed/cancelled)
+        return all.filter((l) => l.account.status &&
+            ("active" in l.account.status || "claimed" in l.account.status));
+    }
+
+    // ============================================
+    // Ticket Discovery (RPC-based, no localStorage)
+    // ============================================
+
+    /**
+     * Scan for tickets owned by the current wallet.
+     * Uses deterministic secrets to check each possible ticket ID.
+     * 
+     * @param eventConfig - The event to scan
+     * @param maxTicketId - The max ticket ID to scan (usually event.ticketsMinted)
+     * @param ownerPubkey - The wallet public key
+     * @param signMessage - Wallet's signMessage function for deterministic secrets
+     * @returns Array of owned tickets with their secrets
+     */
+    async scanOwnedTickets(
+        eventConfig: PublicKey,
+        maxTicketId: number,
+        ownerPubkey: PublicKey,
+        signMessage: (msg: Uint8Array) => Promise<Uint8Array>
+    ): Promise<Array<{ ticketId: number; secret: Uint8Array; commitment: string }>> {
+        const ownedTickets: Array<{ ticketId: number; secret: Uint8Array; commitment: string }> = [];
+        const lightRpc = light.getRpc();
+
+        console.log(`🔍 Scanning tickets 1-${maxTicketId} for ${ownerPubkey.toBase58().slice(0, 8)}...`);
+
+        // Sign ONCE to get master key, then derive all secrets from it
+        const masterKey = await commitment.generateMasterKey(signMessage, eventConfig);
+        console.log(`🔑 Master key generated (single signature)`);
+
+        const { bn } = await import("@lightprotocol/stateless.js");
+
+        for (let ticketId = 1; ticketId <= maxTicketId; ticketId++) {
+            try {
+                // Derive secret from master key (no signing needed)
+                const secret = commitment.deriveTicketSecret(masterKey, ticketId);
+
+                // Compute what our commitment would be
+                const ourCommitment = commitment.computeCommitment(ownerPubkey, secret);
+
+                // Derive the ticket address from this commitment
+                const ticketAddress = light.deriveTicketAddress(ourCommitment, this.programId);
+
+                // Check if this ticket exists on-chain
+                const account = await lightRpc.getCompressedAccount(bn(ticketAddress.toBytes()));
+
+                if (account) {
+                    // Also check nullifier doesn't exist (ticket not spent)
+                    const nullifierAddress = light.deriveNullifierAddress(secret, this.programId);
+                    const nullifier = await lightRpc.getCompressedAccount(bn(nullifierAddress.toBytes()));
+
+                    if (!nullifier) {
+                        console.log(`✅ Found owned ticket #${ticketId}`);
+                        ownedTickets.push({
+                            ticketId,
+                            secret,
+                            commitment: commitment.commitmentToHex(ourCommitment),
+                        });
+                    } else {
+                        console.log(`⚠️ Ticket #${ticketId} has been spent (nullifier exists)`);
+                    }
+                }
+            } catch (err) {
+                // Ticket doesn't exist or error - continue scanning
+            }
+        }
+
+        console.log(`🔍 Scan complete. Found ${ownedTickets.length} tickets.`);
+        return ownedTickets;
     }
 }

@@ -8,11 +8,12 @@ import { BN } from "@coral-xyz/anchor";
 import { useEncore } from '../hooks/useEncore';
 import type { ListingWithPubkey } from '../lib/services/encore';
 import {
-    generateRandomSecret,
+    generateMasterKey,
+    deriveTicketSecret,
     computeCommitment,
     commitmentToHex,
     decryptSecret,
-    hexToBytes
+    hexToBytes,
 } from '../lib/services/commitment';
 import { STORAGE_KEYS } from '../lib/config';
 
@@ -42,11 +43,30 @@ interface MyTicket {
     commitment: string;
 }
 
+// Pending claim (Bob claimed but waiting for Alice to release)
+interface MyClaim {
+    ticketId: number;
+    listingPubkey: string;
+    secret: Uint8Array;
+    commitment: string;
+    status: 'claimed' | 'completed' | 'cancelled' | 'unknown';
+}
+
+// Listing status for a ticket
+interface TicketListingStatus {
+    ticketId: number;
+    listingPda: string;
+    status: 'active' | 'claimed' | 'completed' | 'cancelled' | null;
+    isMine: boolean;  // Is current user the seller?
+    buyer: string | null;
+    pricePerTicket: number;
+}
+
 const DEFAULT_MINT_PRICE = 0.1 * LAMPORTS_PER_SOL;
 
 export const EventDetail: FC = () => {
     const { eventId } = useParams<{ eventId: string }>();
-    const { publicKey, connected } = useWallet();
+    const { publicKey, connected, signMessage } = useWallet();
     const client = useEncore();
 
     const [event, setEvent] = useState<EventData | null>(null);
@@ -61,6 +81,12 @@ export const EventDetail: FC = () => {
     const [showResellModal, setShowResellModal] = useState(false);
     const [resellTicketId, setResellTicketId] = useState<number | null>(null);
     const [resellPrice, setResellPrice] = useState('');
+
+    // Track listing status for each of my tickets
+    const [ticketListingStatuses, setTicketListingStatuses] = useState<Map<number, TicketListingStatus>>(new Map());
+
+    // Track my pending claims (as buyer)
+    const [myClaims, setMyClaims] = useState<MyClaim[]>([]);
 
     const loadEvent = useCallback(async () => {
         if (!client || !eventId) return;
@@ -100,8 +126,7 @@ export const EventDetail: FC = () => {
                 }))
             );
 
-            // Load my tickets from localStorage
-            loadMyTickets();
+            // Note: loadMyTickets is called in separate useEffect after event is set
         } catch (err) {
             console.error('Failed to load event:', err);
             setError('Failed to load event');
@@ -110,7 +135,8 @@ export const EventDetail: FC = () => {
         }
     }, [client, eventId]);
 
-    const loadMyTickets = () => {
+    // Load tickets from localStorage
+    const loadMyTickets = useCallback(() => {
         if (!publicKey || !eventId) {
             setMyTickets([]);
             return;
@@ -135,8 +161,9 @@ export const EventDetail: FC = () => {
         } else {
             setMyTickets([]);
         }
-    };
+    }, [publicKey, eventId]);
 
+    // Save ticket to localStorage
     const saveTicket = (ticketId: number, secret: Uint8Array, commitment: Uint8Array) => {
         if (!publicKey || !eventId) return;
 
@@ -144,23 +171,201 @@ export const EventDetail: FC = () => {
         const stored = localStorage.getItem(storageKey);
         const tickets = stored ? JSON.parse(stored) : [];
 
-        tickets.push({
-            ticketId,
-            secret: Array.from(secret),
-            commitment: commitmentToHex(commitment),
-        });
+        // Avoid duplicates
+        if (!tickets.find((t: { ticketId: number }) => t.ticketId === ticketId)) {
+            tickets.push({
+                ticketId,
+                secret: Array.from(secret),
+                commitment: commitmentToHex(commitment),
+            });
+            localStorage.setItem(storageKey, JSON.stringify(tickets));
+        }
 
-        localStorage.setItem(storageKey, JSON.stringify(tickets));
         loadMyTickets();
     };
+
+    // Remove ticket from localStorage
+    const removeTicket = (ticketId: number) => {
+        if (!publicKey || !eventId) {
+            console.log('❌ removeTicket: missing publicKey or eventId');
+            return;
+        }
+
+        const storageKey = `${STORAGE_KEYS.TICKETS_PREFIX}${publicKey.toBase58()}_${eventId}`;
+        const stored = localStorage.getItem(storageKey);
+        console.log(`🗑️ removeTicket #${ticketId}:`, { storageKey, hadData: !!stored });
+
+        if (stored) {
+            const tickets = JSON.parse(stored);
+            const updated = tickets.filter((t: { ticketId: number }) => t.ticketId !== ticketId);
+            console.log(`🗑️ Tickets before: ${tickets.length}, after: ${updated.length}`);
+            localStorage.setItem(storageKey, JSON.stringify(updated));
+        }
+        loadMyTickets();
+    };
+
+    // Check listing status for each of my tickets by deriving PDA
+    const checkMyTicketListings = useCallback(async () => {
+        if (!client || !publicKey || myTickets.length === 0) return;
+
+        const statuses = new Map<number, TicketListingStatus>();
+
+        for (const ticket of myTickets) {
+            try {
+                // Compute commitment from our secret
+                const ticketCommitment = computeCommitment(publicKey, ticket.secret);
+
+                // Derive the listing PDA
+                const listingPda = client.getListingPda(publicKey, ticketCommitment);
+
+                // Try to fetch the listing
+                const listing = await client.fetchListing(listingPda);
+
+                if (listing) {
+                    // Determine status string
+                    let status: 'active' | 'claimed' | 'completed' | 'cancelled' = 'active';
+                    if ('claimed' in listing.status) status = 'claimed';
+                    else if ('sold' in listing.status || 'completed' in listing.status) status = 'completed';
+                    else if ('cancelled' in listing.status) status = 'cancelled';
+
+                    statuses.set(ticket.ticketId, {
+                        ticketId: ticket.ticketId,
+                        listingPda: listingPda.toBase58(),
+                        status,
+                        isMine: listing.seller.toBase58() === publicKey.toBase58(),
+                        buyer: listing.buyer?.toBase58() || null,
+                        pricePerTicket: Number(listing.priceLamports),
+                    });
+                } else {
+                    // No listing exists
+                    statuses.set(ticket.ticketId, {
+                        ticketId: ticket.ticketId,
+                        listingPda: listingPda.toBase58(),
+                        status: null,
+                        isMine: false,
+                        buyer: null,
+                        pricePerTicket: 0,
+                    });
+                }
+            } catch (err) {
+                console.error(`Failed to check listing for ticket ${ticket.ticketId}:`, err);
+                // Assume no listing on error
+                statuses.set(ticket.ticketId, {
+                    ticketId: ticket.ticketId,
+                    listingPda: '',
+                    status: null,
+                    isMine: false,
+                    buyer: null,
+                    pricePerTicket: 0,
+                });
+            }
+        }
+
+        setTicketListingStatuses(statuses);
+    }, [client, publicKey, myTickets]);
 
     useEffect(() => {
         loadEvent();
     }, [loadEvent]);
 
+    // Check listings whenever my tickets change
+    useEffect(() => {
+        checkMyTicketListings();
+    }, [checkMyTicketListings]);
+
+    // Check for completed claims that should be moved to my tickets
+    // Also loads pending claims for display
+    const checkAndLoadClaims = useCallback(async () => {
+        if (!publicKey || !eventId || !client) return;
+
+        const claimKeyPrefix = `${STORAGE_KEYS.CLAIMS_PREFIX}${publicKey.toBase58()}_`;
+        const pendingClaims: MyClaim[] = [];
+        let ticketsUpdated = false;
+
+        // Iterate through local storage to find claims
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(claimKeyPrefix)) {
+                try {
+                    const claimData = JSON.parse(localStorage.getItem(key)!);
+
+                    // Skip if no ticketId stored
+                    if (!claimData.ticketId || !claimData.listingPubkey) continue;
+
+                    // Fetch the actual listing status from chain
+                    let listingStatus: 'claimed' | 'completed' | 'cancelled' | 'unknown' = 'unknown';
+                    try {
+                        const listing = await client.fetchListing(new PublicKey(claimData.listingPubkey));
+                        console.log(`📋 Checking claim for ticket #${claimData.ticketId}:`, {
+                            listingPubkey: claimData.listingPubkey,
+                            listingExists: !!listing,
+                            status: listing?.status
+                        });
+
+                        if (listing) {
+                            if ('claimed' in listing.status) listingStatus = 'claimed';
+                            else if ('sold' in listing.status || 'completed' in listing.status) listingStatus = 'completed';
+                            else if ('cancelled' in listing.status) listingStatus = 'cancelled';
+                        } else {
+                            // Listing account doesn't exist (closed) - assume completed
+                            listingStatus = 'completed';
+                        }
+                    } catch {
+                        // Fetch failed - listing might be closed, assume completed
+                        listingStatus = 'completed';
+                    }
+
+                    if (listingStatus === 'completed') {
+                        // Sale completed! Save ticket to localStorage
+                        const buyerSecret = new Uint8Array(claimData.secret);
+                        const buyerCommitment = hexToBytes(claimData.commitment);
+
+                        saveTicket(claimData.ticketId, buyerSecret, buyerCommitment);
+                        localStorage.removeItem(key);
+                        ticketsUpdated = true;
+                        console.log(`✅ Claim converted to ticket: #${claimData.ticketId}`);
+                    } else if (listingStatus === 'cancelled') {
+                        // Seller cancelled - remove our claim
+                        localStorage.removeItem(key);
+                        console.log(`❌ Claim removed (seller cancelled): #${claimData.ticketId}`);
+                    } else if (listingStatus === 'claimed') {
+                        // Still pending - add to display list
+                        pendingClaims.push({
+                            ticketId: claimData.ticketId,
+                            listingPubkey: claimData.listingPubkey,
+                            secret: new Uint8Array(claimData.secret),
+                            commitment: claimData.commitment,
+                            status: listingStatus,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error processing claim:', e);
+                }
+            }
+        }
+
+        setMyClaims(pendingClaims);
+
+        if (ticketsUpdated) {
+            loadMyTickets();
+        }
+    }, [publicKey, eventId, client]);
+
+    useEffect(() => {
+        checkAndLoadClaims();
+    }, [checkAndLoadClaims]);
+
+    // Re-check claims when listings change (someone might have completed a sale)
+    useEffect(() => {
+        if (listings.length >= 0) {
+            checkAndLoadClaims();
+        }
+    }, [listings]);
+
+    // Load tickets when wallet or event changes
     useEffect(() => {
         loadMyTickets();
-    }, [publicKey, eventId]);
+    }, [publicKey, eventId, loadMyTickets]);
 
     const { setVisible } = useWalletModal(); // Add this hook
 
@@ -179,10 +384,17 @@ export const EventDetail: FC = () => {
         setSuccess(null);
 
         try {
-            // Generate secret and commitment
-            const secret = generateRandomSecret();
-            const commitment = computeCommitment(publicKey, secret);
+            if (!signMessage) {
+                setError('Wallet does not support message signing');
+                return;
+            }
+
             const ticketId = event.ticketsMinted + 1;
+
+            // Generate master key (one signature) then derive ticket secret
+            const masterKey = await generateMasterKey(signMessage, new PublicKey(eventId));
+            const secret = deriveTicketSecret(masterKey, ticketId);
+            const commitment = computeCommitment(publicKey, secret);
 
             // Mint the ticket
             await client.mintTicket(
@@ -260,8 +472,14 @@ export const EventDetail: FC = () => {
         setSuccess(null);
 
         try {
-            // Generate buyer's secret and commitment
-            const secret = generateRandomSecret();
+            if (!signMessage) {
+                setError('Wallet does not support message signing');
+                return;
+            }
+
+            // Generate master key (one signature) then derive ticket secret
+            const masterKey = await generateMasterKey(signMessage, new PublicKey(listing.eventConfig));
+            const secret = deriveTicketSecret(masterKey, listing.ticketId);
             const commitment = computeCommitment(publicKey, secret);
 
             await client.claimListing(
@@ -277,9 +495,10 @@ export const EventDetail: FC = () => {
                 commitment: commitmentToHex(commitment),
                 encryptedSecret: listing.encryptedSecret,
                 listingPubkey: listing.pubkey,
+                ticketId: listing.ticketId // Save ticketId so we can construct the ticket later
             }));
 
-            setSuccess(`Listing claimed! Now complete the purchase.`);
+            setSuccess(`Listing claimed! Waiting for seller to release the ticket.`);
             await loadEvent();
         } catch (err) {
             console.error('Failed to claim listing:', err);
@@ -292,45 +511,144 @@ export const EventDetail: FC = () => {
     const handleCompleteSale = async (listing: ListingData) => {
         if (!client || !publicKey || !eventId) return;
 
+        if (!listing.buyerCommitment) {
+            setError("Error: Buyer commitment not found on listing.");
+            return;
+        }
+
         setActionLoading(`complete-${listing.pubkey}`);
         setError(null);
         setSuccess(null);
 
         try {
-            // Get stored claim info
-            const claimKey = `${STORAGE_KEYS.CLAIMS_PREFIX}${publicKey.toBase58()}_${listing.pubkey}`;
-            const stored = localStorage.getItem(claimKey);
-            if (!stored) throw new Error('Claim info not found');
-
-            const claimInfo = JSON.parse(stored);
-            const buyerSecret = new Uint8Array(claimInfo.secret);
-            const buyerCommitment = hexToBytes(claimInfo.commitment);
-
-            // Get the listing PDA to decrypt the seller's secret
-            const listingPda = new PublicKey(listing.pubkey);
-
             // Decrypt seller's secret using listing PDA as key
+            const listingPda = new PublicKey(listing.pubkey);
             const sellerSecret = decryptSecret(
                 new Uint8Array(listing.encryptedSecret),
                 listingPda.toBytes()
             );
 
+            const buyerCommitment = new Uint8Array(listing.buyerCommitment);
+
             await client.completeSale(
                 new PublicKey(eventId),
                 listing.ticketId,
                 new PublicKey(listing.seller),
-                publicKey,
+                publicKey, // Seller signs
                 sellerSecret,
                 buyerCommitment
             );
 
-            // Save the new ticket
-            saveTicket(listing.ticketId, buyerSecret, buyerCommitment);
+            console.log(`✅ completeSale succeeded for ticket #${listing.ticketId}, now removing from localStorage...`);
 
-            // Remove claim info
-            localStorage.removeItem(claimKey);
+            // Remove ticket from seller's localStorage
+            removeTicket(listing.ticketId);
 
-            setSuccess(`Purchase complete! Ticket #${listing.ticketId} is now yours.`);
+            setSuccess(`Ticket released! Sale completed for Ticket #${listing.ticketId}.`);
+            await loadEvent();
+        } catch (err) {
+            console.error('Failed to complete sale:', err);
+            setError(err instanceof Error ? err.message : 'Failed to complete sale');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleCancelListing = async (listing: ListingData) => {
+        if (!client || !publicKey) return;
+
+        setActionLoading(`cancel-${listing.pubkey}`);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            await client.cancelListing(
+                new PublicKey(listing.pubkey),
+                publicKey
+            );
+
+            setSuccess(`Listing for Ticket #${listing.ticketId} cancelled.`);
+            await loadEvent();
+        } catch (err) {
+            console.error('Failed to cancel listing:', err);
+            setError(err instanceof Error ? err.message : 'Failed to cancel listing');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Cancel listing from My Tickets view (using ticket's listing status)
+    const handleCancelMyListing = async (ticketId: number) => {
+        if (!client || !publicKey) return;
+
+        const listingStatus = ticketListingStatuses.get(ticketId);
+        if (!listingStatus || !listingStatus.listingPda) return;
+
+        setActionLoading(`cancel-ticket-${ticketId}`);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            await client.cancelListing(
+                new PublicKey(listingStatus.listingPda),
+                publicKey
+            );
+
+            setSuccess(`Listing for Ticket #${ticketId} cancelled.`);
+            await loadEvent();
+            await checkMyTicketListings();
+        } catch (err) {
+            console.error('Failed to cancel listing:', err);
+            setError(err instanceof Error ? err.message : 'Failed to cancel listing');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Complete sale from My Tickets view
+    const handleCompleteMyListing = async (ticketId: number) => {
+        if (!client || !publicKey || !eventId) return;
+
+        const listingStatus = ticketListingStatuses.get(ticketId);
+        if (!listingStatus || !listingStatus.listingPda) return;
+
+        const ticket = myTickets.find(t => t.ticketId === ticketId);
+        if (!ticket) return;
+
+        setActionLoading(`complete-ticket-${ticketId}`);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            // Fetch the listing to get buyer info
+            const listing = await client.fetchListing(new PublicKey(listingStatus.listingPda));
+            if (!listing || !listing.buyerCommitment) {
+                setError('Listing not found or not claimed yet');
+                return;
+            }
+
+            // Decrypt seller's secret using listing PDA as key
+            const listingPda = new PublicKey(listingStatus.listingPda);
+            const sellerSecret = decryptSecret(
+                new Uint8Array(listing.encryptedSecret),
+                listingPda.toBytes()
+            );
+
+            const buyerCommitment = new Uint8Array(listing.buyerCommitment);
+
+            await client.completeSale(
+                new PublicKey(eventId),
+                ticketId,
+                listing.seller,
+                publicKey, // Seller signs
+                sellerSecret,
+                buyerCommitment
+            );
+
+            // Remove ticket from seller's localStorage
+            removeTicket(ticketId);
+
+            setSuccess(`Ticket #${ticketId} sold! Ticket released to buyer.`);
             await loadEvent();
         } catch (err) {
             console.error('Failed to complete sale:', err);
@@ -389,7 +707,7 @@ export const EventDetail: FC = () => {
                             <span className="stat-label">SOL</span>
                         </div>
                     </div>
-                    
+
                     {!soldOut && (
                         <div style={{ marginTop: '2rem' }}>
                             <button
@@ -397,10 +715,10 @@ export const EventDetail: FC = () => {
                                 onClick={handleMintTicket}
                                 disabled={actionLoading === 'mint'}
                             >
-                                {actionLoading === 'mint' 
-                                    ? 'Minting...' 
-                                    : !connected 
-                                        ? 'Connect & Buy Ticket' 
+                                {actionLoading === 'mint'
+                                    ? 'Minting...'
+                                    : !connected
+                                        ? 'Connect & Buy Ticket'
                                         : 'Buy Ticket'
                                 }
                             </button>
@@ -426,24 +744,137 @@ export const EventDetail: FC = () => {
                     <section className="section">
                         <h2>🎫 My Tickets ({myTickets.length})</h2>
                         <div className="tickets-list">
-                            {myTickets.map((ticket) => (
-                                <div key={ticket.ticketId} className="ticket-card">
+                            {myTickets.map((ticket) => {
+                                const listingStatus = ticketListingStatuses.get(ticket.ticketId);
+                                const isListed = listingStatus?.status === 'active';
+                                const isClaimed = listingStatus?.status === 'claimed';
+                                const isCancelled = listingStatus?.status === 'cancelled';
+
+                                return (
+                                    <div key={ticket.ticketId} className="ticket-card">
+                                        <div className="ticket-info">
+                                            <span className="ticket-id">Ticket #{ticket.ticketId}</span>
+                                            <span className="ticket-commitment" title={ticket.commitment}>
+                                                {ticket.commitment.slice(0, 8)}...
+                                            </span>
+                                            {isListed && (
+                                                <span className="badge badge-listed">
+                                                    Listed for {(listingStatus!.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                                                </span>
+                                            )}
+                                            {isClaimed && (
+                                                <span className="badge badge-claimed">
+                                                    Claimed - Ready to release
+                                                </span>
+                                            )}
+                                            {isCancelled && (
+                                                <span className="badge badge-cancelled">
+                                                    Cancelled (needs cleanup)
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="ticket-actions">
+                                            {/* No listing or cancelled zombie - can list */}
+                                            {(!listingStatus?.status || isCancelled) && (
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    onClick={() => {
+                                                        setResellTicketId(ticket.ticketId);
+                                                        setResellPrice((DEFAULT_MINT_PRICE / LAMPORTS_PER_SOL).toFixed(2));
+                                                        setShowResellModal(true);
+                                                    }}
+                                                >
+                                                    List for Sale
+                                                </button>
+                                            )}
+                                            {/* Listed but not claimed - can cancel */}
+                                            {isListed && (
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    onClick={() => handleCancelMyListing(ticket.ticketId)}
+                                                    disabled={actionLoading === `cancel-ticket-${ticket.ticketId}`}
+                                                >
+                                                    {actionLoading === `cancel-ticket-${ticket.ticketId}`
+                                                        ? 'Cancelling...'
+                                                        : 'Cancel Listing'}
+                                                </button>
+                                            )}
+                                            {/* Claimed - seller should release */}
+                                            {isClaimed && (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => handleCompleteMyListing(ticket.ticketId)}
+                                                    disabled={actionLoading === `complete-ticket-${ticket.ticketId}`}
+                                                >
+                                                    {actionLoading === `complete-ticket-${ticket.ticketId}`
+                                                        ? 'Releasing...'
+                                                        : 'Release Ticket'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+
+                {/* My Pending Claims (as Buyer) */}
+                {connected && myClaims.length > 0 && (
+                    <section className="section">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2>⏳ Pending Purchases ({myClaims.length})</h2>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={async () => {
+                                    setActionLoading('refresh-claims');
+                                    await checkAndLoadClaims();
+                                    setActionLoading(null);
+                                }}
+                                disabled={actionLoading === 'refresh-claims'}
+                            >
+                                {actionLoading === 'refresh-claims' ? 'Checking...' : '🔄 Check Status'}
+                            </button>
+                        </div>
+                        <div className="tickets-list">
+                            {myClaims.map((claim) => (
+                                <div key={claim.listingPubkey} className="ticket-card">
                                     <div className="ticket-info">
-                                        <span className="ticket-id">Ticket #{ticket.ticketId}</span>
-                                        <span className="ticket-commitment" title={ticket.commitment}>
-                                            {ticket.commitment.slice(0, 8)}...
+                                        <span className="ticket-id">Ticket #{claim.ticketId}</span>
+                                        <span className="badge badge-pending">
+                                            Waiting for seller to release
                                         </span>
                                     </div>
-                                    <button
-                                        className="btn btn-secondary"
-                                        onClick={() => {
-                                            setResellTicketId(ticket.ticketId);
-                                            setResellPrice((DEFAULT_MINT_PRICE / LAMPORTS_PER_SOL).toFixed(2));
-                                            setShowResellModal(true);
-                                        }}
-                                    >
-                                        List for Sale
-                                    </button>
+                                    <div className="ticket-actions">
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={async () => {
+                                                if (!client || !publicKey) return;
+                                                setActionLoading(`cancel-claim-${claim.listingPubkey}`);
+                                                try {
+                                                    await client.cancelClaim(
+                                                        new PublicKey(claim.listingPubkey),
+                                                        publicKey
+                                                    );
+                                                    // Remove from localStorage
+                                                    const claimKey = `${STORAGE_KEYS.CLAIMS_PREFIX}${publicKey.toBase58()}_${claim.listingPubkey}`;
+                                                    localStorage.removeItem(claimKey);
+                                                    setSuccess('Claim cancelled');
+                                                    await loadEvent();
+                                                    await checkAndLoadClaims();
+                                                } catch (err) {
+                                                    setError(err instanceof Error ? err.message : 'Failed to cancel claim');
+                                                } finally {
+                                                    setActionLoading(null);
+                                                }
+                                            }}
+                                            disabled={actionLoading === `cancel-claim-${claim.listingPubkey}`}
+                                        >
+                                            {actionLoading === `cancel-claim-${claim.listingPubkey}`
+                                                ? 'Cancelling...'
+                                                : 'Cancel Claim'}
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -480,17 +911,29 @@ export const EventDetail: FC = () => {
                                         </div>
                                         <div className="listing-actions">
                                             {isMine ? (
-                                                <span className="badge">Your listing</span>
+                                                !isClaimed ? (
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        onClick={() => handleCancelListing(listing)}
+                                                        disabled={actionLoading === `cancel-${listing.pubkey}`}
+                                                    >
+                                                        {actionLoading === `cancel-${listing.pubkey}`
+                                                            ? 'Cancelling...'
+                                                            : 'Cancel Listing'}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        onClick={() => handleCompleteSale(listing)}
+                                                        disabled={actionLoading === `complete-${listing.pubkey}`}
+                                                    >
+                                                        {actionLoading === `complete-${listing.pubkey}`
+                                                            ? 'Releasing...'
+                                                            : 'Release Ticket'}
+                                                    </button>
+                                                )
                                             ) : isMyClaim ? (
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={() => handleCompleteSale(listing)}
-                                                    disabled={actionLoading === `complete-${listing.pubkey}`}
-                                                >
-                                                    {actionLoading === `complete-${listing.pubkey}`
-                                                        ? 'Completing...'
-                                                        : 'Complete Purchase'}
-                                                </button>
+                                                <span className="badge badge-pending">Awaiting seller release</span>
                                             ) : !isClaimed ? (
                                                 <button
                                                     className="btn btn-primary"
@@ -499,8 +942,8 @@ export const EventDetail: FC = () => {
                                                 >
                                                     {actionLoading === `claim-${listing.pubkey}`
                                                         ? 'Claiming...'
-                                                        : !connected 
-                                                            ? 'Connect & Buy' 
+                                                        : !connected
+                                                            ? 'Connect & Buy'
                                                             : 'Buy'
                                                     }
                                                 </button>

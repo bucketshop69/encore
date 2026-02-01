@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-02-01
+
+### Marketplace UX Fixes & cancel_claim Instruction (Issues #017, #018)
+
+- **New Instruction: `cancel_claim`** (Issue #017 - ✅ COMPLETE)
+  - Allows buyer to voluntarily release a claimed listing
+  - Resets listing status from `Claimed` → `Active`
+  - Clears buyer and buyer_commitment fields
+  - Added to program mod.rs, lib.rs, and IDL
+
+- **Marketplace End-to-End Flow Fixes**
+  - **Listing Status Display**: Fixed `fetchActiveListings()` to include both `active` AND `claimed` listings
+  - **Seller Release Flow**: Alice now sees "Release Ticket" button when Bob claims her listing
+  - **Ticket Removal on Sale**: `removeTicket()` properly removes from seller's localStorage after `completeSale`
+  - **Claim-to-Ticket Conversion**: Bob's claimed tickets convert to owned tickets when seller releases
+
+- **Deterministic Secrets (Master Key Pattern)**
+  - Single wallet signature per event generates master key
+  - All ticket secrets derived from master key (no repeated signing)
+  - Functions: `generateMasterKey()`, `deriveTicketSecret()`
+  - Backward compatible with existing `generateDeterministicSecret()`
+
+- **UI Improvements**
+  - "Check Status" button in Pending Purchases section for manual refresh
+  - Console logging for debugging claim/ticket flow
+  - Proper state updates after marketplace actions
+
+- **Technical Notes**
+  - RPC scanning for tickets not feasible (ticket addresses use random seeds for privacy)
+  - localStorage remains the source of truth for ticket ownership
+  - Future: Consider encrypted backup solution for secret recovery
+
+---
+
 ## [0.4.0] - 2026-01-31
 
 ### Codama Kit Migration (Issue #016 - ✅ COMPLETE)

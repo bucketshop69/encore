@@ -10,25 +10,27 @@ pub struct CancelListing<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
 
-    /// Listing being cancelled
+    /// Listing being cancelled - will be closed and rent returned to seller
     #[account(
         mut,
         seeds = [LISTING_SEED, listing.seller.as_ref(), &listing.ticket_commitment],
         bump = listing.bump,
+        close = seller,  // Close account and return rent to seller
     )]
     pub listing: Account<'info, Listing>,
 }
 
 /// Cancel a marketplace listing before it's claimed.
+/// The listing account is closed and rent is returned to the seller.
 ///
 /// # Operations
 /// 1. Validate listing is Active
-/// 2. Set status to Cancelled
+/// 2. Close account (handled by Anchor's `close` constraint)
 pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
     let seller = &ctx.accounts.seller;
-    let listing = &mut ctx.accounts.listing;
+    let listing = &ctx.accounts.listing;
 
-    // Validate listing status
+    // Validate listing status - can only cancel Active listings
     require!(
         listing.status == ListingStatus::Active,
         EncoreError::ListingNotActive
@@ -37,10 +39,12 @@ pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
     // Validate seller is the listing seller
     require!(listing.seller == seller.key(), EncoreError::NotSeller);
 
-    // Set status to Cancelled
-    listing.status = ListingStatus::Cancelled;
+    // Account will be closed automatically by Anchor's `close = seller` constraint
 
-    msg!("✅ Listing cancelled by seller: {:?}", seller.key());
+    msg!(
+        "✅ Listing cancelled and closed by seller: {:?}",
+        seller.key()
+    );
 
     Ok(())
 }

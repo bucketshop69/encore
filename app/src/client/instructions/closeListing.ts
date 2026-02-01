@@ -32,17 +32,17 @@ import {
 import { ENCORE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
-export const CANCEL_LISTING_DISCRIMINATOR = new Uint8Array([
-  41, 183, 50, 232, 230, 233, 157, 70,
+export const CLOSE_LISTING_DISCRIMINATOR = new Uint8Array([
+  33, 15, 192, 81, 78, 175, 159, 97,
 ]);
 
-export function getCancelListingDiscriminatorBytes() {
+export function getCloseListingDiscriminatorBytes() {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CANCEL_LISTING_DISCRIMINATOR
+    CLOSE_LISTING_DISCRIMINATOR
   );
 }
 
-export type CancelListingInstruction<
+export type CloseListingInstruction<
   TProgram extends string = typeof ENCORE_PROGRAM_ADDRESS,
   TAccountSeller extends string | AccountMeta<string> = string,
   TAccountListing extends string | AccountMeta<string> = string,
@@ -62,53 +62,51 @@ export type CancelListingInstruction<
     ]
   >;
 
-export type CancelListingInstructionData = {
-  discriminator: ReadonlyUint8Array;
-};
+export type CloseListingInstructionData = { discriminator: ReadonlyUint8Array };
 
-export type CancelListingInstructionDataArgs = {};
+export type CloseListingInstructionDataArgs = {};
 
-export function getCancelListingInstructionDataEncoder(): FixedSizeEncoder<CancelListingInstructionDataArgs> {
+export function getCloseListingInstructionDataEncoder(): FixedSizeEncoder<CloseListingInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: CANCEL_LISTING_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: CLOSE_LISTING_DISCRIMINATOR })
   );
 }
 
-export function getCancelListingInstructionDataDecoder(): FixedSizeDecoder<CancelListingInstructionData> {
+export function getCloseListingInstructionDataDecoder(): FixedSizeDecoder<CloseListingInstructionData> {
   return getStructDecoder([
     ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
-export function getCancelListingInstructionDataCodec(): FixedSizeCodec<
-  CancelListingInstructionDataArgs,
-  CancelListingInstructionData
+export function getCloseListingInstructionDataCodec(): FixedSizeCodec<
+  CloseListingInstructionDataArgs,
+  CloseListingInstructionData
 > {
   return combineCodec(
-    getCancelListingInstructionDataEncoder(),
-    getCancelListingInstructionDataDecoder()
+    getCloseListingInstructionDataEncoder(),
+    getCloseListingInstructionDataDecoder()
   );
 }
 
-export type CancelListingInput<
+export type CloseListingInput<
   TAccountSeller extends string = string,
   TAccountListing extends string = string,
 > = {
-  /** Seller who is cancelling the listing */
+  /** Seller who owns the listing */
   seller: TransactionSigner<TAccountSeller>;
-  /** Listing being cancelled - will be closed and rent returned to seller */
+  /** Listing being closed - rent returned to seller */
   listing: Address<TAccountListing>;
 };
 
-export function getCancelListingInstruction<
+export function getCloseListingInstruction<
   TAccountSeller extends string,
   TAccountListing extends string,
   TProgramAddress extends Address = typeof ENCORE_PROGRAM_ADDRESS,
 >(
-  input: CancelListingInput<TAccountSeller, TAccountListing>,
+  input: CloseListingInput<TAccountSeller, TAccountListing>,
   config?: { programAddress?: TProgramAddress }
-): CancelListingInstruction<TProgramAddress, TAccountSeller, TAccountListing> {
+): CloseListingInstruction<TProgramAddress, TAccountSeller, TAccountListing> {
   // Program address.
   const programAddress = config?.programAddress ?? ENCORE_PROGRAM_ADDRESS;
 
@@ -128,37 +126,37 @@ export function getCancelListingInstruction<
       getAccountMeta(accounts.seller),
       getAccountMeta(accounts.listing),
     ],
-    data: getCancelListingInstructionDataEncoder().encode({}),
+    data: getCloseListingInstructionDataEncoder().encode({}),
     programAddress,
-  } as CancelListingInstruction<
+  } as CloseListingInstruction<
     TProgramAddress,
     TAccountSeller,
     TAccountListing
   >);
 }
 
-export type ParsedCancelListingInstruction<
+export type ParsedCloseListingInstruction<
   TProgram extends string = typeof ENCORE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Seller who is cancelling the listing */
+    /** Seller who owns the listing */
     seller: TAccountMetas[0];
-    /** Listing being cancelled - will be closed and rent returned to seller */
+    /** Listing being closed - rent returned to seller */
     listing: TAccountMetas[1];
   };
-  data: CancelListingInstructionData;
+  data: CloseListingInstructionData;
 };
 
-export function parseCancelListingInstruction<
+export function parseCloseListingInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
-): ParsedCancelListingInstruction<TProgram, TAccountMetas> {
+): ParsedCloseListingInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
@@ -172,6 +170,6 @@ export function parseCancelListingInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: { seller: getNextAccount(), listing: getNextAccount() },
-    data: getCancelListingInstructionDataDecoder().decode(instruction.data),
+    data: getCloseListingInstructionDataDecoder().decode(instruction.data),
   };
 }

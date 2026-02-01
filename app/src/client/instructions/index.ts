@@ -6,8 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from './cancelClaim';
 export * from './cancelListing';
 export * from './claimListing';
+export * from './closeListing';
 export * from './completeSale';
 export * from './createEvent';
 export * from './createListing';

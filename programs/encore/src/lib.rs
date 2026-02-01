@@ -141,6 +141,14 @@ pub mod encore {
         instructions::cancel_listing(ctx)
     }
 
+    pub fn close_listing(ctx: Context<CloseListing>) -> Result<()> {
+        instructions::close_listing(ctx)
+    }
+
+    pub fn cancel_claim(ctx: Context<CancelClaim>) -> Result<()> {
+        instructions::cancel_claim(ctx)
+    }
+
     pub fn release_claim(ctx: Context<ReleaseClaim>) -> Result<()> {
         instructions::release_claim(ctx)
     }

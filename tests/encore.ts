@@ -754,6 +754,220 @@ describe("Encore Privacy Tests - Commitment + Nullifier Model", () => {
   });
 
   // ===============================================
+  // CANCEL CLAIM TEST (Issue #017)
+  // ===============================================
+
+  it("Should cancel claim (Buyer releases claimed listing)", async function () {
+    console.log("🔄 Testing cancel claim (buyer unclaims listing)...");
+
+    // Create fresh wallets for this test
+    const testSeller = web3.Keypair.generate();
+    const testBuyer = web3.Keypair.generate();
+
+    await fundWallet(testSeller, 0.1);
+    await fundWallet(testBuyer, 0.05);
+
+    console.log("Seller:", testSeller.publicKey.toBase58());
+    console.log("Buyer:", testBuyer.publicKey.toBase58());
+
+    // --- Step 1: Create a listing ---
+    const sellerSecret = crypto.randomBytes(32);
+    const sellerCommitment = computeCommitment(testSeller.publicKey, sellerSecret);
+
+    const sellerCommitmentBuffer = Buffer.from(sellerCommitment);
+    const [testListingPda] = web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), testSeller.publicKey.toBuffer(), sellerCommitmentBuffer],
+      program.programId
+    );
+
+    const listingPdaHash = crypto.createHash('sha256').update(testListingPda.toBuffer()).digest();
+    const encryptedSecret = Buffer.alloc(32);
+    for (let i = 0; i < 32; i++) {
+      encryptedSecret[i] = sellerSecret[i] ^ listingPdaHash[i];
+    }
+
+    const priceLamports = new anchor.BN(1_000_000_000); // 1 SOL
+
+    await program.methods
+      .createListing(
+        Array.from(sellerCommitment),
+        Array.from(encryptedSecret),
+        priceLamports,
+        eventConfigPda,
+        101,  // Test ticket ID
+        Array.from(crypto.randomBytes(32)),
+        0,
+      )
+      .accountsPartial({
+        seller: testSeller.publicKey,
+        listing: testListingPda,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .signers([testSeller])
+      .rpc();
+
+    console.log("✅ Listing created");
+
+    // Verify listing is Active
+    let listing = await program.account.listing.fetch(testListingPda);
+    assert.deepEqual(listing.status, { active: {} }, "Status should be Active");
+
+    // --- Step 2: Buyer claims the listing ---
+    const buyerSecret = crypto.randomBytes(32);
+    const buyerCommitment = computeCommitment(testBuyer.publicKey, buyerSecret);
+
+    await program.methods
+      .claimListing(Array.from(buyerCommitment))
+      .accountsPartial({
+        buyer: testBuyer.publicKey,
+        listing: testListingPda,
+      })
+      .signers([testBuyer])
+      .rpc();
+
+    console.log("✅ Listing claimed by buyer");
+
+    // Verify listing is Claimed
+    listing = await program.account.listing.fetch(testListingPda);
+    assert.deepEqual(listing.status, { claimed: {} }, "Status should be Claimed");
+    assert.ok(listing.buyer?.equals(testBuyer.publicKey), "Buyer should be set");
+    assert.ok(listing.buyerCommitment, "Buyer commitment should be set");
+    assert.ok(listing.claimedAt, "Claimed at should be set");
+
+    // --- Step 3: Buyer cancels their claim ---
+    await program.methods
+      .cancelClaim()
+      .accountsPartial({
+        buyer: testBuyer.publicKey,
+        listing: testListingPda,
+      })
+      .signers([testBuyer])
+      .rpc();
+
+    console.log("✅ Claim cancelled by buyer");
+
+    // Verify listing is back to Active
+    listing = await program.account.listing.fetch(testListingPda);
+    assert.deepEqual(listing.status, { active: {} }, "Status should be Active");
+    assert.equal(listing.buyer, null, "Buyer should be cleared");
+    assert.equal(listing.buyerCommitment, null, "Buyer commitment should be cleared");
+    assert.equal(listing.claimedAt, null, "Claimed at should be cleared");
+    console.log("📊 Listing verified: status = Active, buyer = null");
+
+    // --- Step 4: Verify another buyer can now claim ---
+    const newBuyer = web3.Keypair.generate();
+    await fundWallet(newBuyer, 0.05);
+
+    const newBuyerSecret = crypto.randomBytes(32);
+    const newBuyerCommitment = computeCommitment(newBuyer.publicKey, newBuyerSecret);
+
+    await program.methods
+      .claimListing(Array.from(newBuyerCommitment))
+      .accountsPartial({
+        buyer: newBuyer.publicKey,
+        listing: testListingPda,
+      })
+      .signers([newBuyer])
+      .rpc();
+
+    console.log("✅ New buyer claimed the listing");
+
+    // Verify new claim
+    listing = await program.account.listing.fetch(testListingPda);
+    assert.deepEqual(listing.status, { claimed: {} }, "Status should be Claimed");
+    assert.ok(listing.buyer?.equals(newBuyer.publicKey), "New buyer should be set");
+    console.log("📊 Listing verified: new buyer successfully claimed");
+
+    console.log("🎉 Cancel claim test complete!");
+  });
+
+  it("Should fail cancel claim if not the buyer", async function () {
+    console.log("🔒 Testing cancel claim authorization...");
+
+    // Create fresh wallets
+    const testSeller = web3.Keypair.generate();
+    const testBuyer = web3.Keypair.generate();
+    const attacker = web3.Keypair.generate();
+
+    await fundWallet(testSeller, 0.1);
+    await fundWallet(testBuyer, 0.05);
+    await fundWallet(attacker, 0.05);
+
+    // Create listing
+    const sellerSecret = crypto.randomBytes(32);
+    const sellerCommitment = computeCommitment(testSeller.publicKey, sellerSecret);
+
+    const sellerCommitmentBuffer = Buffer.from(sellerCommitment);
+    const [testListingPda] = web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("listing"), testSeller.publicKey.toBuffer(), sellerCommitmentBuffer],
+      program.programId
+    );
+
+    const listingPdaHash = crypto.createHash('sha256').update(testListingPda.toBuffer()).digest();
+    const encryptedSecret = Buffer.alloc(32);
+    for (let i = 0; i < 32; i++) {
+      encryptedSecret[i] = sellerSecret[i] ^ listingPdaHash[i];
+    }
+
+    await program.methods
+      .createListing(
+        Array.from(sellerCommitment),
+        Array.from(encryptedSecret),
+        new anchor.BN(1_000_000_000),
+        eventConfigPda,
+        102,
+        Array.from(crypto.randomBytes(32)),
+        0,
+      )
+      .accountsPartial({
+        seller: testSeller.publicKey,
+        listing: testListingPda,
+        systemProgram: web3.SystemProgram.programId,
+      })
+      .signers([testSeller])
+      .rpc();
+
+    // Buyer claims
+    const buyerSecret = crypto.randomBytes(32);
+    const buyerCommitment = computeCommitment(testBuyer.publicKey, buyerSecret);
+
+    await program.methods
+      .claimListing(Array.from(buyerCommitment))
+      .accountsPartial({
+        buyer: testBuyer.publicKey,
+        listing: testListingPda,
+      })
+      .signers([testBuyer])
+      .rpc();
+
+    console.log("✅ Setup complete: listing claimed by buyer");
+
+    // Attacker tries to cancel the claim
+    try {
+      await program.methods
+        .cancelClaim()
+        .accountsPartial({
+          buyer: attacker.publicKey,
+          listing: testListingPda,
+        })
+        .signers([attacker])
+        .rpc();
+
+      assert.fail("Should have thrown NotBuyer error");
+    } catch (e: any) {
+      assert.ok(e.message.includes("NotBuyer") || e.message.includes("Not the listing buyer"),
+        "Should fail with NotBuyer error");
+      console.log("✅ Correctly rejected: attacker cannot cancel another's claim");
+    }
+
+    // Verify listing is still claimed by original buyer
+    const listing = await program.account.listing.fetch(testListingPda);
+    assert.deepEqual(listing.status, { claimed: {} }, "Status should still be Claimed");
+    assert.ok(listing.buyer?.equals(testBuyer.publicKey), "Original buyer should still be set");
+    console.log("📊 Listing verified: still claimed by original buyer");
+  });
+
+  // ===============================================
   // PRIVACY CASH PAYMENT TEST (Issue #011)
   // ===============================================
 

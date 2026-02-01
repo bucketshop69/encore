@@ -14,8 +14,10 @@ import {
   type ReadonlyUint8Array,
 } from '@solana/kit';
 import {
+  type ParsedCancelClaimInstruction,
   type ParsedCancelListingInstruction,
   type ParsedClaimListingInstruction,
+  type ParsedCloseListingInstruction,
   type ParsedCompleteSaleInstruction,
   type ParsedCreateEventInstruction,
   type ParsedCreateListingInstruction,
@@ -65,8 +67,10 @@ export function identifyEncoreAccount(
 }
 
 export enum EncoreInstruction {
+  CancelClaim,
   CancelListing,
   ClaimListing,
+  CloseListing,
   CompleteSale,
   CreateEvent,
   CreateListing,
@@ -80,6 +84,17 @@ export function identifyEncoreInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array
 ): EncoreInstruction {
   const data = 'data' in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([179, 1, 212, 49, 81, 144, 221, 140])
+      ),
+      0
+    )
+  ) {
+    return EncoreInstruction.CancelClaim;
+  }
   if (
     containsBytes(
       data,
@@ -101,6 +116,17 @@ export function identifyEncoreInstruction(
     )
   ) {
     return EncoreInstruction.ClaimListing;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([33, 15, 192, 81, 78, 175, 159, 97])
+      ),
+      0
+    )
+  ) {
+    return EncoreInstruction.CloseListing;
   }
   if (
     containsBytes(
@@ -188,11 +214,17 @@ export type ParsedEncoreInstruction<
   TProgram extends string = 'BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V',
 > =
   | ({
+      instructionType: EncoreInstruction.CancelClaim;
+    } & ParsedCancelClaimInstruction<TProgram>)
+  | ({
       instructionType: EncoreInstruction.CancelListing;
     } & ParsedCancelListingInstruction<TProgram>)
   | ({
       instructionType: EncoreInstruction.ClaimListing;
     } & ParsedClaimListingInstruction<TProgram>)
+  | ({
+      instructionType: EncoreInstruction.CloseListing;
+    } & ParsedCloseListingInstruction<TProgram>)
   | ({
       instructionType: EncoreInstruction.CompleteSale;
     } & ParsedCompleteSaleInstruction<TProgram>)

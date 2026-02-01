@@ -79,4 +79,7 @@ pub enum EncoreError {
 
     #[msg("Invalid price")]
     InvalidPrice,
+
+    #[msg("Listing not cancelled or completed")]
+    ListingNotCancelled,
 }

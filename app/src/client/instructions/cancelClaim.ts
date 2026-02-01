@@ -32,29 +32,29 @@ import {
 import { ENCORE_PROGRAM_ADDRESS } from '../programs';
 import { getAccountMetaFactory, type ResolvedAccount } from '../shared';
 
-export const CANCEL_LISTING_DISCRIMINATOR = new Uint8Array([
-  41, 183, 50, 232, 230, 233, 157, 70,
+export const CANCEL_CLAIM_DISCRIMINATOR = new Uint8Array([
+  179, 1, 212, 49, 81, 144, 221, 140,
 ]);
 
-export function getCancelListingDiscriminatorBytes() {
+export function getCancelClaimDiscriminatorBytes() {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CANCEL_LISTING_DISCRIMINATOR
+    CANCEL_CLAIM_DISCRIMINATOR
   );
 }
 
-export type CancelListingInstruction<
+export type CancelClaimInstruction<
   TProgram extends string = typeof ENCORE_PROGRAM_ADDRESS,
-  TAccountSeller extends string | AccountMeta<string> = string,
+  TAccountBuyer extends string | AccountMeta<string> = string,
   TAccountListing extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountSeller extends string
-        ? WritableSignerAccount<TAccountSeller> &
-            AccountSignerMeta<TAccountSeller>
-        : TAccountSeller,
+      TAccountBuyer extends string
+        ? WritableSignerAccount<TAccountBuyer> &
+            AccountSignerMeta<TAccountBuyer>
+        : TAccountBuyer,
       TAccountListing extends string
         ? WritableAccount<TAccountListing>
         : TAccountListing,
@@ -62,59 +62,57 @@ export type CancelListingInstruction<
     ]
   >;
 
-export type CancelListingInstructionData = {
-  discriminator: ReadonlyUint8Array;
-};
+export type CancelClaimInstructionData = { discriminator: ReadonlyUint8Array };
 
-export type CancelListingInstructionDataArgs = {};
+export type CancelClaimInstructionDataArgs = {};
 
-export function getCancelListingInstructionDataEncoder(): FixedSizeEncoder<CancelListingInstructionDataArgs> {
+export function getCancelClaimInstructionDataEncoder(): FixedSizeEncoder<CancelClaimInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([['discriminator', fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: CANCEL_LISTING_DISCRIMINATOR })
+    (value) => ({ ...value, discriminator: CANCEL_CLAIM_DISCRIMINATOR })
   );
 }
 
-export function getCancelListingInstructionDataDecoder(): FixedSizeDecoder<CancelListingInstructionData> {
+export function getCancelClaimInstructionDataDecoder(): FixedSizeDecoder<CancelClaimInstructionData> {
   return getStructDecoder([
     ['discriminator', fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
-export function getCancelListingInstructionDataCodec(): FixedSizeCodec<
-  CancelListingInstructionDataArgs,
-  CancelListingInstructionData
+export function getCancelClaimInstructionDataCodec(): FixedSizeCodec<
+  CancelClaimInstructionDataArgs,
+  CancelClaimInstructionData
 > {
   return combineCodec(
-    getCancelListingInstructionDataEncoder(),
-    getCancelListingInstructionDataDecoder()
+    getCancelClaimInstructionDataEncoder(),
+    getCancelClaimInstructionDataDecoder()
   );
 }
 
-export type CancelListingInput<
-  TAccountSeller extends string = string,
+export type CancelClaimInput<
+  TAccountBuyer extends string = string,
   TAccountListing extends string = string,
 > = {
-  /** Seller who is cancelling the listing */
-  seller: TransactionSigner<TAccountSeller>;
-  /** Listing being cancelled - will be closed and rent returned to seller */
+  /** Buyer who is cancelling their claim */
+  buyer: TransactionSigner<TAccountBuyer>;
+  /** Listing being unclaimed */
   listing: Address<TAccountListing>;
 };
 
-export function getCancelListingInstruction<
-  TAccountSeller extends string,
+export function getCancelClaimInstruction<
+  TAccountBuyer extends string,
   TAccountListing extends string,
   TProgramAddress extends Address = typeof ENCORE_PROGRAM_ADDRESS,
 >(
-  input: CancelListingInput<TAccountSeller, TAccountListing>,
+  input: CancelClaimInput<TAccountBuyer, TAccountListing>,
   config?: { programAddress?: TProgramAddress }
-): CancelListingInstruction<TProgramAddress, TAccountSeller, TAccountListing> {
+): CancelClaimInstruction<TProgramAddress, TAccountBuyer, TAccountListing> {
   // Program address.
   const programAddress = config?.programAddress ?? ENCORE_PROGRAM_ADDRESS;
 
   // Original accounts.
   const originalAccounts = {
-    seller: { value: input.seller ?? null, isWritable: true },
+    buyer: { value: input.buyer ?? null, isWritable: true },
     listing: { value: input.listing ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
@@ -125,40 +123,36 @@ export function getCancelListingInstruction<
   const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.seller),
+      getAccountMeta(accounts.buyer),
       getAccountMeta(accounts.listing),
     ],
-    data: getCancelListingInstructionDataEncoder().encode({}),
+    data: getCancelClaimInstructionDataEncoder().encode({}),
     programAddress,
-  } as CancelListingInstruction<
-    TProgramAddress,
-    TAccountSeller,
-    TAccountListing
-  >);
+  } as CancelClaimInstruction<TProgramAddress, TAccountBuyer, TAccountListing>);
 }
 
-export type ParsedCancelListingInstruction<
+export type ParsedCancelClaimInstruction<
   TProgram extends string = typeof ENCORE_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** Seller who is cancelling the listing */
-    seller: TAccountMetas[0];
-    /** Listing being cancelled - will be closed and rent returned to seller */
+    /** Buyer who is cancelling their claim */
+    buyer: TAccountMetas[0];
+    /** Listing being unclaimed */
     listing: TAccountMetas[1];
   };
-  data: CancelListingInstructionData;
+  data: CancelClaimInstructionData;
 };
 
-export function parseCancelListingInstruction<
+export function parseCancelClaimInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>
-): ParsedCancelListingInstruction<TProgram, TAccountMetas> {
+): ParsedCancelClaimInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error('Not enough accounts');
@@ -171,7 +165,7 @@ export function parseCancelListingInstruction<
   };
   return {
     programAddress: instruction.programAddress,
-    accounts: { seller: getNextAccount(), listing: getNextAccount() },
-    data: getCancelListingInstructionDataDecoder().decode(instruction.data),
+    accounts: { buyer: getNextAccount(), listing: getNextAccount() },
+    data: getCancelClaimInstructionDataDecoder().decode(instruction.data),
   };
 }
