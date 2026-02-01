@@ -498,7 +498,7 @@ export const EventDetail: FC = () => {
                 ticketId: listing.ticketId // Save ticketId so we can construct the ticket later
             }));
 
-            setSuccess(`Listing claimed! Waiting for seller to release the ticket.`);
+            setSuccess(`Deposited ${(listing.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL to escrow. Waiting for seller to release the ticket.`);
             await loadEvent();
         } catch (err) {
             console.error('Failed to claim listing:', err);
@@ -544,7 +544,7 @@ export const EventDetail: FC = () => {
             // Remove ticket from seller's localStorage
             removeTicket(listing.ticketId);
 
-            setSuccess(`Ticket released! Sale completed for Ticket #${listing.ticketId}.`);
+            setSuccess(`Ticket #${listing.ticketId} sold! Received ${(listing.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL.`);
             await loadEvent();
         } catch (err) {
             console.error('Failed to complete sale:', err);
@@ -648,11 +648,65 @@ export const EventDetail: FC = () => {
             // Remove ticket from seller's localStorage
             removeTicket(ticketId);
 
-            setSuccess(`Ticket #${ticketId} sold! Ticket released to buyer.`);
+            setSuccess(`Ticket #${ticketId} sold! Received ${(Number(listing.priceLamports) / LAMPORTS_PER_SOL).toFixed(2)} SOL.`);
             await loadEvent();
         } catch (err) {
             console.error('Failed to complete sale:', err);
             setError(err instanceof Error ? err.message : 'Failed to complete sale');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Seller cancels a claimed listing (refunds buyer)
+    const handleSellerCancelClaim = async (listing: ListingData) => {
+        if (!client || !publicKey) return;
+
+        setActionLoading(`seller-cancel-${listing.pubkey}`);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            await client.sellerCancelClaim(
+                new PublicKey(listing.pubkey),
+                publicKey,
+                new PublicKey(listing.buyer!)
+            );
+
+            setSuccess(`Listing cancelled. Refunded ${(listing.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL to buyer.`);
+            await loadEvent();
+        } catch (err) {
+            console.error('Failed to cancel claim:', err);
+            setError(err instanceof Error ? err.message : 'Failed to cancel claim');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // Seller cancels a claimed listing from My Tickets view
+    const handleSellerCancelMyListing = async (ticketId: number) => {
+        if (!client || !publicKey) return;
+
+        const listingStatus = ticketListingStatuses.get(ticketId);
+        if (!listingStatus || !listingStatus.listingPda || !listingStatus.buyer) return;
+
+        setActionLoading(`seller-cancel-ticket-${ticketId}`);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            await client.sellerCancelClaim(
+                new PublicKey(listingStatus.listingPda),
+                publicKey,
+                new PublicKey(listingStatus.buyer)
+            );
+
+            setSuccess(`Listing cancelled. Refunded ${(listingStatus.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL to buyer.`);
+            await loadEvent();
+            await checkMyTicketListings();
+        } catch (err) {
+            console.error('Failed to cancel claim:', err);
+            setError(err instanceof Error ? err.message : 'Failed to cancel claim');
         } finally {
             setActionLoading(null);
         }
@@ -799,17 +853,29 @@ export const EventDetail: FC = () => {
                                                         : 'Cancel Listing'}
                                                 </button>
                                             )}
-                                            {/* Claimed - seller should release */}
+                                            {/* Claimed - seller should release or cancel */}
                                             {isClaimed && (
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={() => handleCompleteMyListing(ticket.ticketId)}
-                                                    disabled={actionLoading === `complete-ticket-${ticket.ticketId}`}
-                                                >
-                                                    {actionLoading === `complete-ticket-${ticket.ticketId}`
-                                                        ? 'Releasing...'
-                                                        : 'Release Ticket'}
-                                                </button>
+                                                <>
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        onClick={() => handleCompleteMyListing(ticket.ticketId)}
+                                                        disabled={actionLoading === `complete-ticket-${ticket.ticketId}`}
+                                                    >
+                                                        {actionLoading === `complete-ticket-${ticket.ticketId}`
+                                                            ? 'Releasing...'
+                                                            : `Release & Receive ${(listingStatus!.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL`}
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        onClick={() => handleSellerCancelMyListing(ticket.ticketId)}
+                                                        disabled={actionLoading === `seller-cancel-ticket-${ticket.ticketId}`}
+                                                        style={{ marginLeft: '0.5rem' }}
+                                                    >
+                                                        {actionLoading === `seller-cancel-ticket-${ticket.ticketId}`
+                                                            ? 'Cancelling...'
+                                                            : 'Cancel & Refund'}
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -837,46 +903,59 @@ export const EventDetail: FC = () => {
                             </button>
                         </div>
                         <div className="tickets-list">
-                            {myClaims.map((claim) => (
-                                <div key={claim.listingPubkey} className="ticket-card">
-                                    <div className="ticket-info">
-                                        <span className="ticket-id">Ticket #{claim.ticketId}</span>
-                                        <span className="badge badge-pending">
-                                            Waiting for seller to release
-                                        </span>
+                            {myClaims.map((claim) => {
+                                // Find the listing to get the price
+                                const listing = listings.find(l => l.pubkey === claim.listingPubkey);
+                                const escrowAmount = listing ? listing.pricePerTicket : 0;
+
+                                return (
+                                    <div key={claim.listingPubkey} className="ticket-card">
+                                        <div className="ticket-info">
+                                            <span className="ticket-id">Ticket #{claim.ticketId}</span>
+                                            {escrowAmount > 0 && (
+                                                <span className="badge badge-escrow">
+                                                    💰 {(escrowAmount / LAMPORTS_PER_SOL).toFixed(2)} SOL in escrow
+                                                </span>
+                                            )}
+                                            <span className="badge badge-pending">
+                                                Waiting for seller to release
+                                            </span>
+                                        </div>
+                                        <div className="ticket-actions">
+                                            <button
+                                                className="btn btn-secondary"
+                                                onClick={async () => {
+                                                    if (!client || !publicKey) return;
+                                                    setActionLoading(`cancel-claim-${claim.listingPubkey}`);
+                                                    try {
+                                                        await client.cancelClaim(
+                                                            new PublicKey(claim.listingPubkey),
+                                                            publicKey
+                                                        );
+                                                        // Remove from localStorage
+                                                        const claimKey = `${STORAGE_KEYS.CLAIMS_PREFIX}${publicKey.toBase58()}_${claim.listingPubkey}`;
+                                                        localStorage.removeItem(claimKey);
+                                                        setSuccess(`Claim cancelled. ${escrowAmount > 0 ? `Refunded ${(escrowAmount / LAMPORTS_PER_SOL).toFixed(2)} SOL.` : ''}`);
+                                                        await loadEvent();
+                                                        await checkAndLoadClaims();
+                                                    } catch (err) {
+                                                        setError(err instanceof Error ? err.message : 'Failed to cancel claim');
+                                                    } finally {
+                                                        setActionLoading(null);
+                                                    }
+                                                }}
+                                                disabled={actionLoading === `cancel-claim-${claim.listingPubkey}`}
+                                            >
+                                                {actionLoading === `cancel-claim-${claim.listingPubkey}`
+                                                    ? 'Refunding...'
+                                                    : escrowAmount > 0
+                                                        ? `Cancel & Get ${(escrowAmount / LAMPORTS_PER_SOL).toFixed(2)} SOL Back`
+                                                        : 'Cancel Claim'}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="ticket-actions">
-                                        <button
-                                            className="btn btn-secondary"
-                                            onClick={async () => {
-                                                if (!client || !publicKey) return;
-                                                setActionLoading(`cancel-claim-${claim.listingPubkey}`);
-                                                try {
-                                                    await client.cancelClaim(
-                                                        new PublicKey(claim.listingPubkey),
-                                                        publicKey
-                                                    );
-                                                    // Remove from localStorage
-                                                    const claimKey = `${STORAGE_KEYS.CLAIMS_PREFIX}${publicKey.toBase58()}_${claim.listingPubkey}`;
-                                                    localStorage.removeItem(claimKey);
-                                                    setSuccess('Claim cancelled');
-                                                    await loadEvent();
-                                                    await checkAndLoadClaims();
-                                                } catch (err) {
-                                                    setError(err instanceof Error ? err.message : 'Failed to cancel claim');
-                                                } finally {
-                                                    setActionLoading(null);
-                                                }
-                                            }}
-                                            disabled={actionLoading === `cancel-claim-${claim.listingPubkey}`}
-                                        >
-                                            {actionLoading === `cancel-claim-${claim.listingPubkey}`
-                                                ? 'Cancelling...'
-                                                : 'Cancel Claim'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
                 )}
@@ -922,15 +1001,27 @@ export const EventDetail: FC = () => {
                                                             : 'Cancel Listing'}
                                                     </button>
                                                 ) : (
-                                                    <button
-                                                        className="btn btn-primary"
-                                                        onClick={() => handleCompleteSale(listing)}
-                                                        disabled={actionLoading === `complete-${listing.pubkey}`}
-                                                    >
-                                                        {actionLoading === `complete-${listing.pubkey}`
-                                                            ? 'Releasing...'
-                                                            : 'Release Ticket'}
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            className="btn btn-primary"
+                                                            onClick={() => handleCompleteSale(listing)}
+                                                            disabled={actionLoading === `complete-${listing.pubkey}`}
+                                                        >
+                                                            {actionLoading === `complete-${listing.pubkey}`
+                                                                ? 'Releasing...'
+                                                                : `Release & Receive ${(listing.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL`}
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-secondary"
+                                                            onClick={() => handleSellerCancelClaim(listing)}
+                                                            disabled={actionLoading === `seller-cancel-${listing.pubkey}`}
+                                                            style={{ marginLeft: '0.5rem' }}
+                                                        >
+                                                            {actionLoading === `seller-cancel-${listing.pubkey}`
+                                                                ? 'Cancelling...'
+                                                                : 'Cancel & Refund Buyer'}
+                                                        </button>
+                                                    </>
                                                 )
                                             ) : isMyClaim ? (
                                                 <span className="badge badge-pending">Awaiting seller release</span>
@@ -941,10 +1032,10 @@ export const EventDetail: FC = () => {
                                                     disabled={actionLoading === `claim-${listing.pubkey}`}
                                                 >
                                                     {actionLoading === `claim-${listing.pubkey}`
-                                                        ? 'Claiming...'
+                                                        ? 'Depositing...'
                                                         : !connected
                                                             ? 'Connect & Buy'
-                                                            : 'Buy'
+                                                            : `Buy & Deposit ${(listing.pricePerTicket / LAMPORTS_PER_SOL).toFixed(2)} SOL`
                                                     }
                                                 </button>
                                             ) : (

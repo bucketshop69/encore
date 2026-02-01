@@ -49,7 +49,8 @@
 /* Actions */
 .actions {
   display: flex;
-  justify-content: flex-end; /* Align create button to right */
+  justify-content: flex-end;
+  /* Align create button to right */
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -75,8 +76,10 @@
 
 .btn-primary {
   background: var(--color-primary);
-  color: #000; /* Black text on Acid Green */
-  font-weight: 600; /* Extra punch */
+  color: #000;
+  /* Black text on Acid Green */
+  font-weight: 600;
+  /* Extra punch */
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -149,17 +152,17 @@
 .event-card:hover {
   transform: translateY(-4px);
   border-color: var(--color-primary);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .event-location-large {
-    font-size: 3.5rem;
-    font-weight: 400;
-    color: var(--color-primary);
-    margin-bottom: 0.5rem;
-    font-family: var(--font-heading);
-    opacity: 0.9;
-    text-shadow: 0 0 20px rgba(204, 255, 0, 0.2);
+  font-size: 3.5rem;
+  font-weight: 400;
+  color: var(--color-primary);
+  margin-bottom: 0.5rem;
+  font-family: var(--font-heading);
+  opacity: 0.9;
+  text-shadow: 0 0 20px rgba(204, 255, 0, 0.2);
 }
 
 .event-name {
@@ -183,7 +186,7 @@
 .event-hero {
   text-align: center;
   padding: 3rem 2rem;
-  background: linear-gradient(180deg, var(--color-surface) 0%, rgba(17,17,19,0) 100%);
+  background: linear-gradient(180deg, var(--color-surface) 0%, rgba(17, 17, 19, 0) 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   margin-bottom: 3rem;
@@ -265,6 +268,12 @@
 .badge-pending {
   background: #3f3f46;
   color: #d4d4d8;
+}
+
+.badge-escrow {
+  background: #fbbf24;
+  color: #000;
+  font-weight: 600;
 }
 
 /* Tickets List */
@@ -364,7 +373,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(9, 9, 11, 0.9); /* Heavy dark overlay */
+  background: rgba(9, 9, 11, 0.9);
+  /* Heavy dark overlay */
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -373,14 +383,17 @@
 }
 
 .modal {
-  background: #09090b; /* Zinc 950 to match bg */
-  border: 1px solid var(--color-border); /* Subtle border instead of Acid Green */
+  background: #09090b;
+  /* Zinc 950 to match bg */
+  border: 1px solid var(--color-border);
+  /* Subtle border instead of Acid Green */
   border-radius: var(--radius-md);
   width: 95%;
   max-width: 650px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.6); /* Cleaner shadow */
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  /* Cleaner shadow */
   display: flex;
   flex-direction: column;
 }

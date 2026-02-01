@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2026-02-01
+
+### UI Escrow Flow Integration (Issue #018 - ✅ COMPLETE)
+
+- **Marketplace Buttons Show Amounts**
+  - Buy button: "Buy & Deposit X SOL"
+  - Release button: "Release & Receive X SOL"
+  - Cancel claim button: "Cancel & Get X SOL Back"
+
+- **Seller Cancel Feature**
+  - New "Cancel & Refund Buyer" button for sellers on claimed listings
+  - Calls `sellerCancelClaim()` to refund buyer and release listing
+  - Available in both My Tickets and Marketplace views
+
+- **Pending Purchases**
+  - Shows escrow amount badge: "💰 X SOL in escrow"
+  - Cancel button shows refund amount
+
+- **Success Messages**
+  - "Deposited X SOL to escrow. Waiting for seller..."
+  - "Ticket #N sold! Received X SOL."
+  - "Listing cancelled. Refunded X SOL to buyer."
+  - "Claim cancelled. Refunded X SOL."
+
+- **Styling**
+  - Added `.badge-escrow` style (gold/amber)
+
+---
+
 ## [0.6.0] - 2026-02-01
 
 ### SOL Escrow for Marketplace Payments (Issue #011 - ✅ COMPLETE)
