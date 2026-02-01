@@ -1,0 +1,186 @@
+:root {
+  /* Global Reset */
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+:root {
+  /* Industrial Rave Palette */
+  --color-bg: #09090b;      /* Zinc 950 - Deep Void */
+  --color-surface: #111113; /* Almost Black */
+  --color-border: #27272a;  /* Zinc 800 - Subtle Metal */
+  
+  --color-primary: #CCFF00; /* Acid Green - Electric Puke/Safety */
+  --color-primary-dim: #a3cc00;
+  
+  --color-text: #f4f4f5;    /* Zinc 100 - Bone White */
+  --color-text-muted: #a1a1aa; /* Zinc 400 - Concrete */
+
+  /* Fonts */
+  --font-heading: 'Itim', cursive;
+  --font-mono: 'Space Mono', monospace;
+
+  /* Spacing */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 400; /* Itim is naturally "bold" looking */
+  color: #fff;
+  margin: 0 0 0.5em 0;
+}
+
+a {
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+a:hover {
+  filter: brightness(1.2);
+  border-bottom: 1px dashed var(--color-primary);
+}
+
+button {
+  font-family: var(--font-heading); 
+  /* Or use var(--font-mono) for more technical buttons? 
+     Let's stick to Itim for CTAs as requested "handwriting type" vibe */
+  
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1.1em;
+  font-weight: 400;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+button:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(204, 255, 0, 0.1);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px dashed var(--color-primary);
+  outline-offset: 4px;
+}
+
+/* Utilities */
+.text-acid { color: var(--color-primary); }
+.bg-surface { background-color: var(--color-surface); }
+.border-subtle { border: 1px solid var(--color-border); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg); 
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333; 
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555; 
+  }
+
+  /* Wallet Adapter Overrides */
+  .wallet-adapter-button {
+      background-color: var(--color-primary) !important;
+      color: #000 !important;
+      font-family: var(--font-heading) !important;
+      border-radius: var(--radius-md) !important;
+      height: 48px !important;
+      font-weight: 600 !important;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+  }
+  
+  .wallet-adapter-button:not([disabled]):hover {
+      background-color: var(--color-primary-dim) !important;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(204, 255, 0, 0.2);
+  }
+  
+  .wallet-adapter-dropdown-list {
+      background: var(--color-surface) !important;
+      border: 1px solid var(--color-border) !important;
+  }
+  
+  .wallet-adapter-dropdown-list-item {
+      font-family: var(--font-mono) !important;
+      color: var(--color-text) !important;
+  }
+  
+  .wallet-adapter-dropdown-list-item:hover {
+      background-color: var(--color-primary) !important;
+      color: #000 !important;
+  }
+
+  /* Wallet Modal Styles (The popup) */
+  .wallet-adapter-modal-wrapper {
+      background: #09090b !important;
+      border: 1px solid var(--color-border) !important;
+      border-radius: var(--radius-md) !important;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8) !important;
+      font-family: var(--font-heading) !important;
+  }
+  
+  .wallet-adapter-modal-title {
+      color: #fff !important;
+      font-weight: 400 !important;
+  }
+  
+  .wallet-adapter-modal-button-close {
+      background: transparent !important;
+      color: var(--color-text-muted) !important;
+  }
+  
+  .wallet-adapter-modal-list .wallet-adapter-button {
+      background-color: var(--color-surface) !important;
+      border: 1px solid var(--color-border) !important;
+      color: var(--color-text) !important;
+      font-family: var(--font-mono) !important;
+      font-weight: 400 !important;
+      border-radius: var(--radius-md) !important;
+      transition: all 0.2s !important;
+  }
+  
+  .wallet-adapter-modal-list .wallet-adapter-button:hover {
+      background-color: var(--color-primary) !important;
+      color: #000 !important;
+      border-color: var(--color-primary) !important;
+  }

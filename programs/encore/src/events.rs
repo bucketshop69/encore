@@ -19,22 +19,25 @@ pub struct EventUpdated {
     pub event_config: Pubkey,
     pub authority: Pubkey,
     pub resale_cap_bps: u32,
-
 }
 
 #[event]
 pub struct TicketMinted {
     pub event_config: Pubkey,
-    pub ticket_id: u32,
-    pub owner: Pubkey,
     pub purchase_price: u64,
 }
 
 #[event]
 pub struct TicketTransferred {
     pub event_config: Pubkey,
-    pub ticket_id: u32,
-    pub old_owner: Pubkey,
-    pub new_owner: Pubkey,
 }
 
+#[event]
+pub struct SaleCompleted {
+    pub listing: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub event_config: Pubkey,
+    pub ticket_id: u32,
+    pub price_lamports: u64,
+}

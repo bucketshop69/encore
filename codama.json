@@ -1,0 +1,13 @@
+{
+    "idl": "target/idl/encore.json",
+    "scripts": {
+        "js": [
+            {
+                "from": "@codama/renderers-js",
+                "args": [
+                    "app/src/lib/generated"
+                ]
+            }
+        ]
+    }
+}

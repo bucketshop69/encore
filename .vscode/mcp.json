@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"Light Protocol": {
+			"url": "https://www.zkcompression.com/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

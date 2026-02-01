@@ -1,6 +1,14 @@
 # Issue #002: Private Ticket Minting
 
-## Overview
+## ⚠️ SUPERSEDED BY ISSUE #009
+
+**This issue has been replaced by [Issue #009: Commitment + Nullifier Privacy Model](./009_commitment_nullifier_model.md)**
+
+The original design used Poseidon hash and ZK circuits. The current implementation uses SHA256 commitments with a simpler model that works on devnet. See #009 for the working implementation.
+
+---
+
+## Overview (Archived)
 
 Implement **privacy-preserving** compressed ticket creation using Light Protocol. Ticket ownership and pricing must be hidden from public viewers but verifiable by the protocol.
 
@@ -10,6 +18,7 @@ Implement **privacy-preserving** compressed ticket creation using Light Protocol
 > "Users submit ZK Proofs to transition state (e.g., 'I own Ticket #42 and am selling it')."
 
 This means:
+
 - ❌ Cannot store `owner: Pubkey` in plaintext
 - ❌ Cannot store `purchase_price: u64` in plaintext  
 - ✅ Must use cryptographic commitments
@@ -71,6 +80,7 @@ The organizer never sees the recipient's secret - only the commitment.
 ### Privacy During Transfer
 
 When transferring, the seller:
+
 1. Proves they own the ticket (ZK proof of commitment preimage)
 2. Reveals a **nullifier** to prevent double-spending
 3. Provides the buyer's new commitment
@@ -102,6 +112,7 @@ The nullifier is stored as a compressed PDA to prevent reuse.
 ## Why This Matters
 
 This approach ensures:
+
 - **No one** (indexers, observers) can see who owns tickets
 - **Only the owner** can prove ownership via ZK proof
 - **Resale caps** are still enforceable via range proofs
@@ -116,6 +127,7 @@ This approach ensures:
 ## Next Steps
 
 After private minting works:
+
 - Issue #003: Private Transfer (ZK proof + nullifier creation)
 - Issue #004: Resale price proofs (range proofs for cap enforcement)
 

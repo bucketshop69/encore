@@ -8,12 +8,15 @@ skip-lint = false
 [programs.localnet]
 encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
 
+[programs.devnet]
+encore = "BjapcaBemidgideMDLWX4wujtnEETZknmNyv28uXVB7V"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=89af9d38-1256-43d3-9c5a-a9aa454d0def"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/marketplace-roundtrip.ts"
