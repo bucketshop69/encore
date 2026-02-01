@@ -149,6 +149,10 @@ pub mod encore {
         instructions::cancel_claim(ctx)
     }
 
+    pub fn seller_cancel_claim(ctx: Context<SellerCancelClaim>) -> Result<()> {
+        instructions::seller_cancel_claim(ctx)
+    }
+
     pub fn release_claim(ctx: Context<ReleaseClaim>) -> Result<()> {
         instructions::release_claim(ctx)
     }

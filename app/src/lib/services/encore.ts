@@ -236,6 +236,14 @@ export class EncoreClient {
         return pda;
     }
 
+    getEscrowPda(listingPda: PublicKey): PublicKey {
+        const [pda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("escrow"), listingPda.toBuffer()],
+            this.programId
+        );
+        return pda;
+    }
+
     async createListing(
         eventConfig: PublicKey,
         ticketId: number,
@@ -270,12 +278,18 @@ export class EncoreClient {
         buyer: PublicKey,
         buyerCommitment: Uint8Array
     ): Promise<string> {
-        const inst = getClaimListingInstruction({
-            buyer: asSigner(toV2Address(buyer)),
-            listing: toV2Address(listingPda),
-            buyerCommitment: buyerCommitment
-        });
-        const tx = new Transaction().add(toV1Instruction(inst));
+        const escrowPda = this.getEscrowPda(listingPda);
+
+        // Use Anchor directly to include escrow account
+        const tx = await this.program.methods
+            .claimListing(Array.from(buyerCommitment))
+            .accountsPartial({
+                buyer: buyer,
+                listing: listingPda,
+                escrow: escrowPda,
+                systemProgram: new PublicKey('11111111111111111111111111111111'),
+            })
+            .transaction();
         return await this.provider.sendAndConfirm(tx);
     }
 
@@ -289,12 +303,31 @@ export class EncoreClient {
     }
 
     async cancelClaim(listingPda: PublicKey, buyer: PublicKey): Promise<string> {
-        // Use Anchor program directly since Codama might not have this yet
+        const escrowPda = this.getEscrowPda(listingPda);
+
         const tx = await this.program.methods
             .cancelClaim()
             .accountsPartial({
                 buyer: buyer,
                 listing: listingPda,
+                escrow: escrowPda,
+                systemProgram: new PublicKey('11111111111111111111111111111111'),
+            })
+            .transaction();
+        return await this.provider.sendAndConfirm(tx);
+    }
+
+    async sellerCancelClaim(listingPda: PublicKey, seller: PublicKey, buyer: PublicKey): Promise<string> {
+        const escrowPda = this.getEscrowPda(listingPda);
+
+        const tx = await this.program.methods
+            .sellerCancelClaim()
+            .accountsPartial({
+                seller: seller,
+                listing: listingPda,
+                escrow: escrowPda,
+                buyer: buyer,
+                systemProgram: new PublicKey('11111111111111111111111111111111'),
             })
             .transaction();
         return await this.provider.sendAndConfirm(tx);
@@ -311,6 +344,7 @@ export class EncoreClient {
         // Compute seller's commitment from their secret
         const sellerCommitment = commitment.computeCommitment(seller, sellerSecret);
         const listingPda = this.getListingPda(seller, sellerCommitment);
+        const escrowPda = this.getEscrowPda(listingPda);
 
         const nullifierAddress = light.deriveNullifierAddress(sellerSecret, this.programId);
         const newTicketSeed = commitment.generateRandomSecret();
@@ -332,8 +366,9 @@ export class EncoreClient {
             )
             .accountsPartial({
                 seller,
-                buyer,
-                listing: listingPda
+                listing: listingPda,
+                escrow: escrowPda,
+                systemProgram: new PublicKey('11111111111111111111111111111111'),
             })
             .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 })])
             .remainingAccounts(remainingAccounts)

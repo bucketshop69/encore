@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-02-01
+
+### SOL Escrow for Marketplace Payments (Issue #011 - ✅ COMPLETE)
+
+- **Escrow PDA System**
+  - Seeds: `["escrow", listing.key()]` - unique escrow per listing
+  - Buyer deposits SOL to escrow when claiming listing
+  - Seller receives SOL from escrow when releasing ticket
+  - Full refund to buyer on any cancellation
+
+- **New Instructions**
+  - `claim_listing`: Now deposits `listing.price` SOL from buyer to escrow PDA
+  - `complete_sale`: Now withdraws escrow SOL to seller via `invoke_signed`
+  - `cancel_claim`: Now refunds escrow SOL to buyer (buyer cancels)
+  - `seller_cancel_claim` (**NEW**): Seller can cancel claimed listing, refunds buyer
+
+- **Technical Implementation**
+  - Added `ESCROW_SEED` constant
+  - PDA signing with `invoke_signed` for System-owned escrow accounts
+  - Proper Rust borrow ordering to satisfy borrow checker
+
+- **Client Updates**
+  - `getEscrowPda()` helper function
+  - All marketplace methods include escrow + systemProgram accounts
+  - `sellerCancelClaim()` method for seller cancellation
+
+- **Testing**
+  - Full round-trip test verified with real SOL deposits/withdrawals
+  - Both trade directions tested (Alice→Bob, Bob→Alice)
+
+---
+
 ## [0.5.0] - 2026-02-01
 
 ### Marketplace UX Fixes & cancel_claim Instruction (Issues #017, #018)

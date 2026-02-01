@@ -78,6 +78,15 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
         return Array.from(hash);
     }
 
+    // Helper: derive escrow PDA from listing
+    function getEscrowPda(listingPda: web3.PublicKey): web3.PublicKey {
+        const [escrowPda] = web3.PublicKey.findProgramAddressSync(
+            [Buffer.from("escrow"), listingPda.toBuffer()],
+            program.programId
+        );
+        return escrowPda;
+    }
+
     // Helper: fund a wallet
     async function fundWallet(wallet: web3.Keypair, amountSol: number) {
         const tx = new web3.Transaction().add(
@@ -324,14 +333,20 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
         console.log(`   🔑 Bob's secret: ${bobSecret.slice(0, 4).toString('hex')}...`);
         console.log(`   🔐 Bob's commitment: ${Buffer.from(bobCommitment).slice(0, 4).toString('hex')}...`);
 
+        const escrow1Pda = getEscrowPda(listing1Pda);
+
         await program.methods
             .claimListing(bobCommitment)
             .accountsPartial({
                 buyer: bob.publicKey,
                 listing: listing1Pda,
+                escrow: escrow1Pda,
+                systemProgram: web3.SystemProgram.programId,
             })
             .signers([bob])
             .rpc();
+
+        console.log(`   💰 Bob deposited 0.15 SOL to escrow`);
 
         // Verify
         await verifyListingStatus(listing1Pda, 'claimed', bob.publicKey);
@@ -390,6 +405,8 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
             addressQueuePubkeyIndex: addressTreeIndex,
         };
 
+        const escrow1Pda = getEscrowPda(listing1Pda);
+
         await program.methods
             .completeSale(
                 { 0: proofRpcResult.compressedProof },
@@ -402,11 +419,15 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
             .accountsPartial({
                 seller: alice.publicKey,
                 listing: listing1Pda,
+                escrow: escrow1Pda,
+                systemProgram: web3.SystemProgram.programId,
             })
             .preInstructions([web3.ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 })])
             .remainingAccounts(packedAccounts.toAccountMetas().remainingAccounts)
             .signers([alice])
             .rpc();
+
+        console.log(`   💰 Alice received payment from escrow`);
 
         nullifierAddresses.push(nullifierAddress);
         ticketAddresses.push(newTicketAddress);
@@ -510,14 +531,20 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
         console.log(`   🔑 Alice's new secret: ${aliceSecret2.slice(0, 4).toString('hex')}...`);
         console.log(`   🔐 Alice's new commitment: ${Buffer.from(aliceCommitment2).slice(0, 4).toString('hex')}...`);
 
+        const escrow2Pda = getEscrowPda(listing2Pda);
+
         await program.methods
             .claimListing(aliceCommitment2)
             .accountsPartial({
                 buyer: alice.publicKey,
                 listing: listing2Pda,
+                escrow: escrow2Pda,
+                systemProgram: web3.SystemProgram.programId,
             })
             .signers([alice])
             .rpc();
+
+        console.log(`   💰 Alice deposited 0.2 SOL to escrow`);
 
         // Verify
         await verifyListingStatus(listing2Pda, 'claimed', alice.publicKey);
@@ -576,6 +603,8 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
             addressQueuePubkeyIndex: addressTreeIndex,
         };
 
+        const escrow2Pda = getEscrowPda(listing2Pda);
+
         await program.methods
             .completeSale(
                 { 0: proofRpcResult.compressedProof },
@@ -588,11 +617,15 @@ describe("Marketplace Round-Trip: Alice → Bob → Alice", () => {
             .accountsPartial({
                 seller: bob.publicKey,
                 listing: listing2Pda,
+                escrow: escrow2Pda,
+                systemProgram: web3.SystemProgram.programId,
             })
             .preInstructions([web3.ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 })])
             .remainingAccounts(packedAccounts.toAccountMetas().remainingAccounts)
             .signers([bob])
             .rpc();
+
+        console.log(`   💰 Bob received payment from escrow`);
 
         nullifierAddresses.push(nullifierAddress);
         ticketAddresses.push(newTicketAddress);

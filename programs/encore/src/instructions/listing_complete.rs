@@ -9,7 +9,7 @@ use light_sdk::{
     instruction::{PackedAddressTreeInfo, ValidityProof},
 };
 
-use crate::constants::{LISTING_SEED, TICKET_SEED};
+use crate::constants::{ESCROW_SEED, LISTING_SEED, TICKET_SEED};
 use crate::errors::EncoreError;
 use crate::events::SaleCompleted;
 use crate::instructions::ticket_mint::LIGHT_CPI_SIGNER;
@@ -30,6 +30,17 @@ pub struct CompleteSale<'info> {
         bump = listing.bump,
     )]
     pub listing: Account<'info, Listing>,
+
+    /// Escrow PDA holding buyer's payment
+    /// CHECK: This is a PDA that holds SOL, validated by seeds
+    #[account(
+        mut,
+        seeds = [ESCROW_SEED, listing.key().as_ref()],
+        bump,
+    )]
+    pub escrow: SystemAccount<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 /// Complete a marketplace sale by transferring the ticket to the buyer.
@@ -55,6 +66,11 @@ pub fn complete_sale<'info>(
     seller_secret: [u8; 32],
 ) -> Result<()> {
     let seller = &ctx.accounts.seller;
+
+    // Get listing key and escrow bump before mutable borrow
+    let listing_key = ctx.accounts.listing.key();
+    let escrow_bump = ctx.bumps.escrow;
+
     let listing = &mut ctx.accounts.listing;
 
     // Validate listing status
@@ -154,6 +170,28 @@ pub fn complete_sale<'info>(
         .with_light_account(new_ticket_account)? // CREATE new ticket
         .with_new_addresses(&[nullifier_params, new_ticket_params])
         .invoke(light_cpi_accounts)?;
+
+    // --- Step 3: Transfer escrow SOL to seller using PDA signing ---
+    let escrow_balance = ctx.accounts.escrow.lamports();
+    if escrow_balance > 0 {
+        let escrow_seeds: &[&[u8]] = &[ESCROW_SEED, listing_key.as_ref(), &[escrow_bump]];
+
+        anchor_lang::system_program::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                anchor_lang::system_program::Transfer {
+                    from: ctx.accounts.escrow.to_account_info(),
+                    to: ctx.accounts.seller.to_account_info(),
+                },
+                &[escrow_seeds],
+            ),
+            escrow_balance,
+        )?;
+        msg!(
+            "💰 Transferred {} lamports from escrow to seller",
+            escrow_balance
+        );
+    }
 
     // Update listing status
     listing.status = ListingStatus::Completed;
