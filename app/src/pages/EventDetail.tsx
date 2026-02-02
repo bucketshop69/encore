@@ -716,7 +716,7 @@ export const EventDetail: FC = () => {
         return (
             <div className="container">
                 <header className="header">
-                    <Link to="/" className="back-link">← Back</Link>
+                    <Link to="/" className="back-link"><img src="/logo.png" alt="Encore" className="logo-small" /> Back</Link>
                     <WalletMultiButton />
                 </header>
                 <div className="loading">Loading event...</div>
@@ -728,7 +728,7 @@ export const EventDetail: FC = () => {
         return (
             <div className="container">
                 <header className="header">
-                    <Link to="/" className="back-link">← Back</Link>
+                    <Link to="/" className="back-link"><img src="/logo.png" alt="Encore" className="logo-small" /> Back</Link>
                     <WalletMultiButton />
                 </header>
                 <div className="error">Event not found</div>
@@ -742,7 +742,7 @@ export const EventDetail: FC = () => {
     return (
         <div className="container">
             <header className="header">
-                <Link to="/" className="back-link">← Back</Link>
+                <Link to="/" className="back-link"><img src="/logo.png" alt="Encore" className="logo-small" /> Back</Link>
                 <WalletMultiButton />
             </header>
 
