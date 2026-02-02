@@ -34,7 +34,7 @@ export const Home: FC = () => {
         try {
             const allEvents = await client.fetchAllEvents();
             console.log("Fetched events:", allEvents);
-            
+
             const validEvents = allEvents.filter((e: any) => {
                 return e.account && e.account.authority && e.account.eventName;
             }).map((e: EventWithPubkey) => ({
@@ -63,7 +63,10 @@ export const Home: FC = () => {
     return (
         <div className="container">
             <header className="header">
-                <h1>🎫 Encore</h1>
+                <div className="logo-title">
+                    <img src="/logo.png" alt="Encore Logo" className="logo" />
+                    <h1>Encore</h1>
+                </div>
                 <p className="subtitle">Privacy-Preserving Event Tickets on Solana</p>
                 <WalletMultiButton />
             </header>

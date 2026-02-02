@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3] - 2026-02-02
+
+### UI Branding
+
+- **Logo Integration**
+  - Added logo to app header next to "Encore" title
+  - Added small logo to back navigation links on event detail pages
+  - Updated favicon to use logo.png instead of default vite.svg
+  - Applied rounded (circular) styling to all logo instances
+
+---
+
 ## [0.6.2] - 2026-02-01
 
 ### Documentation & Demo Improvements
